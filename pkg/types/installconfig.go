@@ -104,6 +104,10 @@ type InstallConfig struct {
 	// perform the installation.
 	Platform `json:"platform"`
 
+	// CloudProvider is the configuration for the specific platform upon which to
+	// perform the installation.
+	CloudProvider CloudProvider `json:"cloudProvider"`
+
 	// PullSecret is the secret to use when pulling images.
 	PullSecret string `json:"pullSecret"`
 
