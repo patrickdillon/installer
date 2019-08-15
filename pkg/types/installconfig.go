@@ -102,6 +102,10 @@ type InstallConfig struct {
 	// perform the installation.
 	Platform `json:"platform"`
 
+	// Platform is the configuration for the specific platform upon which to
+	// perform the installation.
+	CloudPlatform CloudPlatform `json:"cloudPlatform"`
+
 	// PullSecret is the secret to use when pulling images.
 	PullSecret string `json:"pullSecret"`
 
