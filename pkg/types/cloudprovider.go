@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/openshift/installer/pkg/platform/aws"
+	"github.com/openshift/installer/pkg/cloudprovider/aws"
 )
 
 // CloudProvider holds the provider interface.
