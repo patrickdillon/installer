@@ -136,3 +136,14 @@ required = [
   branch = "master"
   name = "github.com/metal3-io/baremetal-operator"
   source = "https://github.com/openshift/baremetal-operator"
+
+[[constraint]]
+  #TODO: FORK to OpenShift
+  name = "github.com/kubernetes-sigs/cluster-api-provider-vsphere"
+  source = "https://github.com/kubernetes-sigs/cluster-api-provider-vsphere"
+  branch = "master"
+
+#TODO REMOVE AFTER CHANGING ABOVE
+[[override]]
+  name = "gopkg.in/fsnotify.v1"
+  source = "https://github.com/fsnotify/fsnotify"
