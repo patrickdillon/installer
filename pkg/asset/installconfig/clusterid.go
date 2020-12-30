@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/pborman/uuid"
-	utilrand "k8s.io/apimachinery/pkg/util/rand"
 
 	"github.com/openshift/installer/pkg/asset"
 )
@@ -75,5 +74,5 @@ func generateInfraID(base string, maxLen int) string {
 	base = strings.TrimRight(base, "-")
 
 	// add random chars to the end to randomize
-	return fmt.Sprintf("%s-%s", base, utilrand.String(randomLen))
+	return fmt.Sprintf("%s-%s", base, "bgnt")
 }
