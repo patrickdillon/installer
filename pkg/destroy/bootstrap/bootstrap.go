@@ -11,6 +11,7 @@ import (
 	"github.com/openshift/installer/pkg/asset/cluster"
 	osp "github.com/openshift/installer/pkg/destroy/openstack"
 	"github.com/openshift/installer/pkg/terraform"
+	typesazure "github.com/openshift/installer/pkg/types/azure"
 	"github.com/openshift/installer/pkg/types/gcp"
 	"github.com/openshift/installer/pkg/types/libvirt"
 	"github.com/openshift/installer/pkg/types/openstack"
@@ -32,11 +33,18 @@ func Destroy(dir string) (err error) {
 
 	tfPlatformVarsFileName := fmt.Sprintf(cluster.TfPlatformVarsFileName, platform)
 
+	// Azure Stack uses the Azure platform but has its own Terraform configuration.
+	// Set platform to azurestack after setting tfPlatformVarsFileName above because the
+	// tfvars file is still terraform.azure.auto.tfvars.json in the case of Azure Stack.
+	if platform == typesazure.Name && metadata.Azure.CloudName == typesazure.StackCloud {
+		platform = "azurestack"
+	}
+
 	tempDir, err := ioutil.TempDir("", "openshift-install-")
 	if err != nil {
 		return errors.Wrap(err, "failed to create temporary directory for Terraform execution")
 	}
-	defer os.RemoveAll(tempDir)
+	//defer os.RemoveAll(tempDir)
 
 	extraArgs := []string{}
 	for _, filename := range []string{terraform.StateFileName, cluster.TfVarsFileName, tfPlatformVarsFileName} {
