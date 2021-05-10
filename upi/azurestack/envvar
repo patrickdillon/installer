@@ -1,0 +1,10 @@
+#!/bin/bash
+export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=registry.build02.ci.openshift.org/ci-op-0ys11zg4/release:latest
+export CLUSTER_NAME=$(yq r install-config.yaml metadata.name)
+export AZURE_REGION=ppe3
+export SSH_KEY=$(yq r install-config.yaml sshKey | xargs)
+export BASE_DOMAIN=$(yq r install-config.yaml baseDomain)
+export TENANT_ID=$(az account show | jq -r .tenantId)
+export SUBSCRIPTION_ID=$(az account show | jq -r .id)
+export AAD_CLIENT_ID=$(jq -r .appId sp.json)
+export AAD_CLIENT_SECRET=$(jq -r .password sp.json)
