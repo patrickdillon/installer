@@ -3,7 +3,7 @@
 This is a guide on how to install OpenShift on Azure Stack Hub in the PPE environment. This document is intended to be used for development
 purposes and does not represent an officially supported installation method. Because of the intended audience & purpose of this document, 
 it will be briefer, less contextual, and more informal than a standard UPI guide. The standard Azure UPI guide may be helpful to provide more
-context. 
+context.
 
 ## Quick Start (using shell script)
 
@@ -15,7 +15,7 @@ context.
 
 ### yq  
 
-There seem to be a few versions of `yq` floating around with different syntaxes. This guide uses https://github.com/mikefarah/yq so either use that one or adjust the commands to fit your preferred `yq.
+There seem to be a few versions of `yq` floating around with different syntaxes. This guide uses https://github.com/mikefarah/yq so either use that one or adjust the commands to fit your preferred `yq`.
 
 ### Connecting to the PPE Environment with the Azure CLI
 
@@ -47,6 +47,9 @@ az ad sp create-for-rbac --role Owner --name <username>-upi > sp.json
 
 Create an install config. The Installer has not merged most azurestack support yet, so you should use credentials for public Azure and also create   install config for public Azure. The commands in following steps will substitute the appropriate values for azure stack into the manifests.
 
+*NOTE* You can use base domain `ppe.ash.devcluster.openshift.com`. There is an NS record setup in route53
+to delegate this zone to PPE nameservers.
+
 ```console
 $ openshift-install create install-config
 ? SSH Public Key /home/user_id/.ssh/id_rsa.pub
@@ -57,7 +60,7 @@ $ openshift-install create install-config
 ? azure service principal client secret xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 INFO Saving user credentials to "/home/user_id/.azure/osServicePrincipal.json"
 ? Region centralus
-? Base Domain example.com
+? Base Domain ppe.ash.devcluster.openshift.com
 ? Cluster Name test
 ? Pull Secret [? for help]
 ```
@@ -105,7 +108,11 @@ $ ./run-upi.sh
 [...]
 ```
 
-Running the script should handle all of the installation. So you can stop here, or read on for more context of what the script is doing.
+After the scripts have completed worker machines should be created but not yet registered as nodes.
+
+Approve the pending CSRs according to [the normal UPI instructions](../azure/install_upi.md#approve-the-worker-csrs): `oc get csr -A` and then `oc adm certificate approve <worker-0-csr> <worker-1-csr> <worker-2-csr>`.
+
+Running the script should handle all of the installation (except approving worker CSRs as noted above). So you can stop here, or read on for more context of what the script is doing.
 
 
 ## Empty the compute pool

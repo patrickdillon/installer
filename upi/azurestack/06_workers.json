@@ -32,7 +32,7 @@
     },
     "nodeVMSize" : {
       "type" : "string",
-      "defaultValue" : "Standard_D4s_v3",
+      "defaultValue" : "Standard_D4s_v2",
       "allowedValues" : [
         "Standard_A2",
         "Standard_A3",
@@ -126,103 +126,81 @@
   },
   "resources" : [
     {
-      "apiVersion" : "2019-05-01",
-      "name" : "[concat('node', copyIndex())]",
-      "type" : "Microsoft.Resources/deployments",
-      "copy" : {
-        "name" : "nodeCopy",
-        "count" : "[length(variables('vmNames'))]"
-      },
+      "apiVersion" : "2017-10-01",
+      "type" : "Microsoft.Network/networkInterfaces",
+      "location": "[variables('location')]",
+      "name" : "[concat(variables('vmNames')[copyIndex()], '-nic')]",
       "properties" : {
-        "mode" : "Incremental",
-        "template" : {
-          "$schema" : "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
-          "contentVersion" : "1.0.0.0",
-          "resources" : [
-            {
-              "apiVersion" : "2018-06-01",
-              "type" : "Microsoft.Network/networkInterfaces",
-              "name" : "[concat(variables('vmNames')[copyIndex()], '-nic')]",
-              "location" : "[variables('location')]",
-              "properties" : {
-                "ipConfigurations" : [
-                  {
-                    "name" : "pipConfig",
-                    "properties" : {
-                      "privateIPAllocationMethod" : "Dynamic",
-                      "subnet" : {
-                        "id" : "[variables('nodeSubnetRef')]"
-                      }
-                    }
-                  }
-                ]
+        "ipConfigurations" : [
+          {
+            "name" : "pipConfig",
+            "properties" : {
+              "privateIPAllocationMethod" : "Dynamic",
+              "subnet" : {
+                "id" : "[variables('nodeSubnetRef')]"
               }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion" : "2017-12-01",
+      "type" : "Microsoft.Compute/virtualMachines",
+      "location" : "[variables('location')]",
+      "name" : "[variables('vmNames')[copyIndex()]]",
+      "dependsOn" : [
+        "[concat('Microsoft.Network/networkInterfaces/', concat(variables('vmNames')[copyIndex()], '-nic'))]"
+      ],
+      "properties" : {
+        "hardwareProfile" : {
+          "vmSize" : "[parameters('nodeVMSize')]"
+        },
+        "osProfile" : {
+          "computerName" : "[variables('vmNames')[copyIndex()]]",
+          "adminUsername" : "core",
+          "customData" : "[parameters('workerIgnition')]",
+          "linuxConfiguration" : {
+            "disablePasswordAuthentication" : true,
+            "ssh" : {
+              "publicKeys" : [
+                {
+                  "path" : "[variables('sshKeyPath')]",
+                  "keyData" : "[parameters('sshKeyData')]"
+                }
+              ]
+            }
+          }
+        },
+        "storageProfile" : {
+          "imageReference": {
+            "id": "[resourceId('Microsoft.Compute/images', variables('imageName'))]"
+          },
+          "osDisk" : {
+            "name": "[concat(variables('vmNames')[copyIndex()],'_OSDisk')]",
+            "osType" : "Linux",
+            "createOption" : "FromImage",
+            "managedDisk": {
+              "storageAccountType": "Standard_LRS"
             },
+            "diskSizeGB": 128
+          }
+        },
+        "networkProfile" : {
+          "networkInterfaces" : [
             {
-              "apiVersion" : "2018-06-01",
-              "type" : "Microsoft.Compute/virtualMachines",
-              "name" : "[variables('vmNames')[copyIndex()]]",
-              "location" : "[variables('location')]",
-              "tags" : {
-                "kubernetes.io-cluster-ffranzupi": "owned"
-              },
-              "identity" : {
-                "type" : "userAssigned",
-                "userAssignedIdentities" : {
-                  "[resourceID('Microsoft.ManagedIdentity/userAssignedIdentities/', variables('identityName'))]" : {}
-                }
-              },
-              "dependsOn" : [
-                "[concat('Microsoft.Network/networkInterfaces/', concat(variables('vmNames')[copyIndex()], '-nic'))]"
-              ],
-              "properties" : {
-                "hardwareProfile" : {
-                  "vmSize" : "[parameters('nodeVMSize')]"
-                },
-                "osProfile" : {
-                  "computerName" : "[variables('vmNames')[copyIndex()]]",
-                  "adminUsername" : "capi",
-                  "customData" : "[parameters('workerIgnition')]",
-                  "linuxConfiguration" : {
-                    "disablePasswordAuthentication" : true,
-                    "ssh" : {
-                      "publicKeys" : [
-                        {
-                          "path" : "[variables('sshKeyPath')]",
-                          "keyData" : "[parameters('sshKeyData')]"
-                        }
-                      ]
-                    }
-                  }
-                },
-                "storageProfile" : {
-                  "imageReference": {
-                    "id": "[resourceId('Microsoft.Compute/images', variables('imageName'))]"
-                  },
-                  "osDisk" : {
-                    "name": "[concat(variables('vmNames')[copyIndex()],'_OSDisk')]",
-                    "osType" : "Linux",
-                    "createOption" : "FromImage",
-                    "managedDisk": {
-                      "storageAccountType": "Premium_LRS"
-                    },
-                    "diskSizeGB": 128
-                  }
-                },
-                "networkProfile" : {
-                  "networkInterfaces" : [
-                    {
-                      "id" : "[resourceId('Microsoft.Network/networkInterfaces', concat(variables('vmNames')[copyIndex()], '-nic'))]",
-                      "properties": {
-                        "primary": true
-                      }
-                    }
-                  ]
-                }
+              "id" : "[resourceId('Microsoft.Network/networkInterfaces', concat(variables('vmNames')[copyIndex()], '-nic'))]",
+              "properties": {
+                "primary": true
               }
             }
           ]
-        }
+        },
+        "diagnosticsProfile": {
+          "bootDiagnostics": {
+            "enabled": true,
+            "storageUri": "[reference(resourceId('Microsoft.Storage/storageAccounts', parameters('diagnosticsStorageAccountName'))).primaryEndpoints.blob]"
+          }
       }
     }
   ]
