@@ -98,9 +98,9 @@ require (
 	google.golang.org/grpc v1.32.0
 	gopkg.in/ini.v1 v1.61.0
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.21.0-rc.0
+	k8s.io/api v0.21.1
 	k8s.io/apiextensions-apiserver v0.21.0-rc.0
-	k8s.io/apimachinery v0.21.0-rc.0
+	k8s.io/apimachinery v0.21.1
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/klog v1.0.0
 	k8s.io/klog/v2 v2.8.0
@@ -149,3 +149,5 @@ replace (
 	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20200526211855-cb27e3aa2013
 	google.golang.org/grpc => google.golang.org/grpc v1.29.1
 )
+
+replace github.com/openshift/api => github.com/patrickdillon/api v0.0.0-20210524162835-a63b67e897c1
