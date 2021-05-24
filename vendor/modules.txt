@@ -1120,7 +1120,7 @@ github.com/opencontainers/image-spec/specs-go/v1
 # github.com/openshift-metal3/terraform-provider-ironic v0.2.6
 ## explicit
 github.com/openshift-metal3/terraform-provider-ironic/ironic
-# github.com/openshift/api v0.0.0-20210420151714-a3c8fa53e01b
+# github.com/openshift/api v0.0.0-20210420151714-a3c8fa53e01b => github.com/patrickdillon/api v0.0.0-20210524162835-a63b67e897c1
 ## explicit
 github.com/openshift/api/config/v1
 github.com/openshift/api/operator/v1
@@ -2108,7 +2108,7 @@ honnef.co/go/tools/staticcheck
 honnef.co/go/tools/stylecheck
 honnef.co/go/tools/unused
 honnef.co/go/tools/version
-# k8s.io/api v0.21.0-rc.0
+# k8s.io/api v0.21.1
 ## explicit
 k8s.io/api/admission/v1
 k8s.io/api/admission/v1beta1
@@ -2161,7 +2161,7 @@ k8s.io/api/storage/v1beta1
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1
-# k8s.io/apimachinery v0.21.0-rc.0
+# k8s.io/apimachinery v0.21.1
 ## explicit
 k8s.io/apimachinery/pkg/api/equality
 k8s.io/apimachinery/pkg/api/errors
@@ -2603,3 +2603,4 @@ sigs.k8s.io/yaml
 # google.golang.org/api => google.golang.org/api v0.25.0
 # google.golang.org/genproto => google.golang.org/genproto v0.0.0-20200526211855-cb27e3aa2013
 # google.golang.org/grpc => google.golang.org/grpc v1.29.1
+# github.com/openshift/api => github.com/patrickdillon/api v0.0.0-20210524162835-a63b67e897c1
