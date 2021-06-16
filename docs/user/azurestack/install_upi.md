@@ -82,7 +82,7 @@ export AAD_CLIENT_SECRET=$(jq -r .password sp.json)
 # currently we need to use images built with openshift/cluster-config-operator#186
 # as well as a kubelet patched with https://github.com/openshift/kubernetes/pull/643
 # this pr has been built into a machine-os-content container and a patched release image is available at:
-export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=http://quay.io/padillon/ash-release-mirror:latest
+export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=quay.io/padillon/ash-release-mirror:latest
 ```
 
 If you are using the script, you can set these variables in the [envvar](../../../upi/azurestack/envvar) file.
