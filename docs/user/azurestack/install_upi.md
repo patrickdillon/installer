@@ -47,7 +47,7 @@ az ad sp create-for-rbac --role Owner --name <username>-upi > sp.json
 
 Create an install config. The Installer has not merged most azurestack support yet, so you should use credentials for public Azure and also create   install config for public Azure. The commands in following steps will substitute the appropriate values for azure stack into the manifests.
 
-*NOTE* You can use base domain `ppe.ash.devcluster.openshift.com`. There is an NS record setup in route53
+*NOTE* You can use base domain `ppe.azurestack.devcluster.openshift.com`. There is an NS record setup in route53
 to delegate this zone to PPE nameservers.
 
 ```console
@@ -60,7 +60,7 @@ $ openshift-install create install-config
 ? azure service principal client secret xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 INFO Saving user credentials to "/home/user_id/.azure/osServicePrincipal.json"
 ? Region centralus
-? Base Domain ppe.ash.devcluster.openshift.com
+? Base Domain ppe.azurestack.devcluster.openshift.com
 ? Cluster Name test
 ? Pull Secret [? for help]
 ```
