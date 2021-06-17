@@ -114,6 +114,8 @@ Approve the pending CSRs according to [the normal UPI instructions](../azure/ins
 
 Running the script should handle all of the installation (except approving worker CSRs as noted above). So you can stop here, or read on for more context of what the script is doing.
 
+To destroy the resources created, simply delete the resource group created in this install.
+
 
 ## Empty the compute pool
 
