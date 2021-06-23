@@ -5,7 +5,6 @@ set -eux
 # allows switching installer binary
 openshift_install=openshift-install
 
-#TODO setup script to use dirs
 rm -rf .openshift* auth ./*.ign
 cp install-config.yaml.upi install-config.yaml
 
@@ -20,28 +19,45 @@ data = yaml.full_load(open(path));
 data["compute"][0]["replicas"] = 0;
 open(path, "w").write(yaml.dump(data, default_flow_style=False))'
 
+azurestackjson=$(cat <<EOF
+{
+  "name": "AzureStackCloud",
+  "resourceManagerEndpoint": "https://management.ppe3.stackpoc.com",
+  "activeDirectoryEndpoint": "https://login.microsoftonline.com/",
+  "galleryEndpoint": "https://providers.ppe3.local:30016/",
+  "storageEndpointSuffix": "https://providers.ppe3.local:30016/",
+  "serviceManagementEndpoint": "https://management.stackpoc.com/81c9b804-ec9e-4b5a-8845-1d197268b1f5",
+  "graphEndpoint":                "https://graph.windows.net/",
+  "resourceIdentifiers": {
+    "graph": "https://graph.windows.net/"
+  }
+}
+EOF
+)
+
 ${openshift_install} create manifests
 
 # we don't want to create any machine* objects 
 rm -f openshift/99_openshift-cluster-api_master-machines-*.yaml
 rm -f openshift/99_openshift-cluster-api_worker-machineset-*.yaml
 
-python3 -c '
+python3 -c "
 import sys, json, yaml, os;
-path = "manifests/cloud-provider-config.yaml";
+path = 'manifests/cloud-provider-config.yaml';
 data = yaml.full_load(open(path));
-config = json.loads(data["data"]["config"]);
-config["cloud"] = "AzureStackCloud";
-config["tenantId"] = os.environ["TENANT_ID"];
-config["subscriptionId"] = os.environ["SUBSCRIPTION_ID"];
-config["location"] = os.environ["AZURE_REGION"];
-config["aadClientId"] = os.environ["AAD_CLIENT_ID"];
-config["aadClientSecret"] = os.environ["AAD_CLIENT_SECRET"];
-config["useManagedIdentityExtension"] = False;
-config["useInstanceMetadata"] = False;
-config["loadBalancerSku"] = "basic";
-data["data"]["config"] = json.dumps(config);
-open(path, "w").write(yaml.dump(data, default_flow_style=False))'
+config = json.loads(data['data']['config']);
+config['cloud'] = 'AzureStackCloud';
+config['tenantId'] = os.environ['TENANT_ID'];
+config['subscriptionId'] = os.environ['SUBSCRIPTION_ID'];
+config['location'] = os.environ['AZURE_REGION'];
+config['aadClientId'] = os.environ['AAD_CLIENT_ID'];
+config['aadClientSecret'] = os.environ['AAD_CLIENT_SECRET'];
+config['useManagedIdentityExtension'] = False;
+config['useInstanceMetadata'] = False;
+config['loadBalancerSku'] = 'basic';
+data['data']['config'] = json.dumps(config);
+data['data']['endpoints'] = json.dumps($azurestackjson);
+open(path, 'w').write(yaml.dump(data, default_flow_style=False))"
 
 python3 -c '
 import yaml,os;
@@ -90,23 +106,6 @@ del data["spec"]["publicZone"];
 del data["spec"]["privateZone"];
 open(path, "w").write(yaml.dump(data, default_flow_style=False))'
 
-
-azurestackjson=$(cat <<EOF
-{
-  "name": "AzureStackCloud",
-  "resourceManagerEndpoint": "https://management.ppe3.stackpoc.com",
-  "activeDirectoryEndpoint": "https://login.microsoftonline.com/",
-  "galleryEndpoint": "https://providers.ppe3.local:30016/",
-  "storageEndpointSuffix": "https://providers.ppe3.local:30016/",
-  "serviceManagementEndpoint": "https://management.stackpoc.com/81c9b804-ec9e-4b5a-8845-1d197268b1f5",
-  "graphEndpoint":                "https://graph.windows.net/",
-  "resourceIdentifiers": {
-    "graph": "https://graph.windows.net/"
-  }
-}
-EOF
-)
-
 cat << EOF > openshift/99_openshift-machineconfig_99-master-azurestackcloud.yaml
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
@@ -115,6 +114,46 @@ metadata:
   labels:
     machineconfiguration.openshift.io/role: master
   name: 99-master-azurestack
+spec:
+  config:
+    ignition:
+      config: {}
+      security:
+        tls: {}
+      timeouts: {}
+      version: 3.2.0
+    networkd: {}
+    passwd: {}
+    storage:
+      files:
+        - path: /etc/kubernetes/azurestackcloud.json
+          contents:
+            source: data:text/plain;charset=utf-8;base64,$(echo $azurestackjson | base64 | tr -d '\n')
+          mode: 420
+          user:
+            name: root
+    systemd:
+      units:
+        - name: kubelet.service
+          dropins:
+            - name: 10-azurestack.conf
+              contents: |
+                [Service]
+                Environment="AZURE_ENVIRONMENT_FILEPATH=/etc/kubernetes/azurestackcloud.json"
+  fips: false
+  kernelArguments: null
+  kernelType: ""
+  osImageURL: ""
+EOF
+
+cat << EOF > openshift/99_openshift-machineconfig_99-worker-azurestackcloud.yaml
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  creationTimestamp: null
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: 99-worker-azurestack
 spec:
   config:
     ignition:
@@ -203,4 +242,12 @@ az deployment group create -g "$RESOURCE_GROUP" \
   --parameters baseName="$INFRA_ID" \
   --parameters masterVMSize="Standard_D4_v2" \
   --parameters diskSizeGB="1023" \
+  --parameters diagnosticsStorageAccountName="${INFRA_ID}sa"
+
+export WORKER_IGNITION=$(cat worker.ign | base64 | tr -d '\n')
+az deployment group create -g "$RESOURCE_GROUP" \
+  --template-file "06_workers.json" \
+  --parameters workerIgnition="$WORKER_IGNITION" \
+  --parameters sshKeyData="$SSH_KEY" \
+  --parameters baseName="$INFRA_ID" \
   --parameters diagnosticsStorageAccountName="${INFRA_ID}sa"
