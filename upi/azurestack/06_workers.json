@@ -30,9 +30,12 @@
         "description" : "SSH RSA public key file as a string"
       }
     },
+    "diagnosticsStorageAccountName": {
+      "type": "string"
+    },
     "nodeVMSize" : {
       "type" : "string",
-      "defaultValue" : "Standard_D4s_v2",
+      "defaultValue" : "Standard_D4_v2",
       "allowedValues" : [
         "Standard_A2",
         "Standard_A3",
@@ -113,23 +116,43 @@
     "nodeSubnetName" : "[concat(parameters('baseName'), '-worker-subnet')]",
     "nodeSubnetRef" : "[concat(variables('virtualNetworkID'), '/subnets/', variables('nodeSubnetName'))]",
     "infraLoadBalancerName" : "[parameters('baseName')]",
-    "sshKeyPath" : "/home/capi/.ssh/authorized_keys",
+    "sshKeyPath" : "/home/core/.ssh/authorized_keys",
     "identityName" : "[concat(parameters('baseName'), '-identity')]",
     "imageName" : "[concat(parameters('baseName'), '-image')]",
-    "copy" : [
-      {
+    "numberOfNodes" : "[parameters('numberOfNodes')]",
+    "vms" : {
+      "copy" : [
+        {
         "name" : "vmNames",
         "count" :  "[parameters('numberOfNodes')]",
-        "input" : "[concat(parameters('baseName'), '-worker-', variables('location'), '-', copyIndex('vmNames', 1))]"
+        "input" : {
+            "name" : "[concat(parameters('baseName'), string('-worker-'), string(copyIndex('vmNames')))]"
+        }
       }
     ]
+  }
   },
   "resources" : [
+    {
+      "name": "[parameters('diagnosticsStorageAccountName')]",
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2017-10-01",
+      "location": "[variables('location')]",
+      "properties": {},
+      "kind": "Storage",
+      "sku": {
+        "name": "Standard_LRS"
+      }
+    },
     {
       "apiVersion" : "2017-10-01",
       "type" : "Microsoft.Network/networkInterfaces",
       "location": "[variables('location')]",
-      "name" : "[concat(variables('vmNames')[copyIndex()], '-nic')]",
+      "copy" : {
+        "name" : "nicCopy",
+        "count" : "[variables('numberOfNodes')]"
+      },
+      "name" : "[concat(variables('vms').vmNames[copyIndex()].name, '-nic')]",
       "properties" : {
         "ipConfigurations" : [
           {
@@ -148,16 +171,21 @@
       "apiVersion" : "2017-12-01",
       "type" : "Microsoft.Compute/virtualMachines",
       "location" : "[variables('location')]",
-      "name" : "[variables('vmNames')[copyIndex()]]",
+      "copy" : {
+        "name" : "vmCopy",
+        "count" : "[variables('numberOfNodes')]"
+      },
+      "name" : "[variables('vms').vmNames[copyIndex()].name]",
       "dependsOn" : [
-        "[concat('Microsoft.Network/networkInterfaces/', concat(variables('vmNames')[copyIndex()], '-nic'))]"
+        "[concat('Microsoft.Network/networkInterfaces/', concat(variables('vms').vmNames[copyIndex()].name, '-nic'))]",
+        "[concat('Microsoft.Storage/storageAccounts/', parameters('diagnosticsStorageAccountName'))]"
       ],
       "properties" : {
         "hardwareProfile" : {
           "vmSize" : "[parameters('nodeVMSize')]"
         },
         "osProfile" : {
-          "computerName" : "[variables('vmNames')[copyIndex()]]",
+          "computerName" : "[variables('vms').vmNames[copyIndex()].name]",
           "adminUsername" : "core",
           "customData" : "[parameters('workerIgnition')]",
           "linuxConfiguration" : {
@@ -177,7 +205,7 @@
             "id": "[resourceId('Microsoft.Compute/images', variables('imageName'))]"
           },
           "osDisk" : {
-            "name": "[concat(variables('vmNames')[copyIndex()],'_OSDisk')]",
+            "name": "[concat(variables('vms').vmNames[copyIndex()].name,'_OSDisk')]",
             "osType" : "Linux",
             "createOption" : "FromImage",
             "managedDisk": {
@@ -189,7 +217,7 @@
         "networkProfile" : {
           "networkInterfaces" : [
             {
-              "id" : "[resourceId('Microsoft.Network/networkInterfaces', concat(variables('vmNames')[copyIndex()], '-nic'))]",
+              "id" : "[resourceId('Microsoft.Network/networkInterfaces', concat(variables('vms').vmNames[copyIndex()].name, '-nic'))]",
               "properties": {
                 "primary": true
               }
@@ -201,6 +229,7 @@
             "enabled": true,
             "storageUri": "[reference(resourceId('Microsoft.Storage/storageAccounts', parameters('diagnosticsStorageAccountName'))).primaryEndpoints.blob]"
           }
+        }
       }
     }
   ]
