@@ -16,6 +16,14 @@ provider "azurestack" {
   tenant_id       = var.azure_tenant_id
 }
 
+provider "azurestackprivate" {
+  arm_endpoint    = var.azure_arm_endpoint
+  subscription_id = var.azure_subscription_id
+  client_id       = var.azure_client_id
+  client_secret   = var.azure_client_secret
+  tenant_id       = var.azure_tenant_id
+}
+
 resource "random_string" "storage_suffix" {
   length  = 5
   upper   = false
@@ -57,15 +65,22 @@ resource "azurestack_storage_container" "vhd" {
   storage_account_name = azurestack_storage_account.cluster.name
 }
 
-resource "azurestack_storage_blob" "rhcos_image" {
+# resource "azurestack_storage_blob" "rhcos_image" {
+#   name                   = "rhcos${random_string.storage_suffix.result}.vhd"
+#   resource_group_name    = data.azurestack_resource_group.main.name
+#   storage_account_name   = azurestack_storage_account.cluster.name
+#   storage_container_name = azurestack_storage_container.vhd.name
+#   type                   = "page"
+#   source_uri             = var.azure_image_url
+# }
+
+resource "azurestackprivate_vhd_blob" "rhcos_image" {
   name                   = "rhcos${random_string.storage_suffix.result}.vhd"
   resource_group_name    = data.azurestack_resource_group.main.name
   storage_account_name   = azurestack_storage_account.cluster.name
   storage_container_name = azurestack_storage_container.vhd.name
-  type                   = "page"
-  source_uri             = var.azure_image_url
+  source                 = "/home/padillon/work/ash-rhcos/rhcos-49.84.202107020624-0-azurestack.x86_64.vhd"
 }
-
 resource "azurestack_image" "cluster" {
   name                = var.cluster_id
   resource_group_name = data.azurestack_resource_group.main.name
@@ -74,7 +89,8 @@ resource "azurestack_image" "cluster" {
   os_disk {
     os_type  = "Linux"
     os_state = "Generalized"
-    blob_uri = azurestack_storage_blob.rhcos_image.url
+    //blob_uri = azurestack_storage_blob.rhcos_image.url
+    blob_uri = azurestackprivate_vhd_blob.rhcos_image.url
   }
 }
 
