@@ -1,6 +1,6 @@
 #!/bin/bash
-# nb: this specific release image is needed until we can build one with the out-of-tree provider support
-export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=quay.io/padillon/ash-release-mirror:latest
+#export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=quay.io/padillon/ash-release-mirror:latest
+export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=registry.ci.openshift.org/ocp/release:4.9.0-0.ci-2021-08-03-115951
 export CLUSTER_NAME=$(yq r install-config.yaml metadata.name)
 export AZURE_REGION=ppe3
 export SSH_KEY=$(yq r install-config.yaml sshKey | xargs)

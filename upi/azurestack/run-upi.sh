@@ -12,28 +12,12 @@ cp install-config.yaml.upi install-config.yaml
 . envvar
 
 # remove workers from the install config so the mco won't try to create them
-python3 -c '
-import yaml;
-path = "install-config.yaml";
-data = yaml.full_load(open(path));
-data["compute"][0]["replicas"] = 0;
-open(path, "w").write(yaml.dump(data, default_flow_style=False))'
-
-azurestackjson=$(cat <<EOF
-{
-  "name": "AzureStackCloud",
-  "resourceManagerEndpoint": "https://management.ppe3.stackpoc.com",
-  "activeDirectoryEndpoint": "https://login.microsoftonline.com/",
-  "galleryEndpoint": "https://providers.ppe3.local:30016/",
-  "storageEndpointSuffix": "https://providers.ppe3.local:30016/",
-  "serviceManagementEndpoint": "https://management.stackpoc.com/81c9b804-ec9e-4b5a-8845-1d197268b1f5",
-  "graphEndpoint":                "https://graph.windows.net/",
-  "resourceIdentifiers": {
-    "graph": "https://graph.windows.net/"
-  }
-}
-EOF
-)
+# python3 -c '
+# import yaml;
+# path = "install-config.yaml";
+# data = yaml.full_load(open(path));
+# data["compute"][0]["replicas"] = 0;
+# open(path, "w").write(yaml.dump(data, default_flow_style=False))'
 
 ${openshift_install} create manifests
 
@@ -41,53 +25,6 @@ ${openshift_install} create manifests
 rm -f openshift/99_openshift-cluster-api_master-machines-*.yaml
 rm -f openshift/99_openshift-cluster-api_worker-machineset-*.yaml
 
-python3 -c "
-import sys, json, yaml, os;
-path = 'manifests/cloud-provider-config.yaml';
-data = yaml.full_load(open(path));
-config = json.loads(data['data']['config']);
-config['cloud'] = 'AzureStackCloud';
-config['tenantId'] = os.environ['TENANT_ID'];
-config['subscriptionId'] = os.environ['SUBSCRIPTION_ID'];
-config['location'] = os.environ['AZURE_REGION'];
-config['aadClientId'] = os.environ['AAD_CLIENT_ID'];
-config['aadClientSecret'] = os.environ['AAD_CLIENT_SECRET'];
-config['useManagedIdentityExtension'] = False;
-config['useInstanceMetadata'] = False;
-config['loadBalancerSku'] = 'basic';
-data['data']['config'] = json.dumps(config);
-data['data']['endpoints'] = json.dumps($azurestackjson);
-open(path, 'w').write(yaml.dump(data, default_flow_style=False))"
-
-python3 -c '
-import yaml,os;
-path = "manifests/cluster-config.yaml";
-data = yaml.full_load(open(path));
-install_config = yaml.full_load(data["data"]["install-config"]);
-platform = install_config["platform"];
-platform["azure"]["cloudName"] = "AzureStackCloud";
-platform["azure"]["region"] = os.environ["AZURE_REGION"];
-install_config["platform"] = platform;
-data["data"]["install-config"] = yaml.dump(install_config);
-open(path, "w").write(yaml.dump(data, default_flow_style=False))'
-
-python3 -c '
-import base64, yaml,os;
-path = "openshift/99_cloud-creds-secret.yaml";
-data = yaml.full_load(open(path));
-data["data"]["azure_subscription_id"] = base64.b64encode(os.environ["SUBSCRIPTION_ID"].encode("ascii")).decode("ascii");
-data["data"]["azure_client_id"] = base64.b64encode(os.environ["AAD_CLIENT_ID"].encode("ascii")).decode("ascii");
-data["data"]["azure_client_secret"] = base64.b64encode(os.environ["AAD_CLIENT_SECRET"].encode("ascii")).decode("ascii");
-data["data"]["azure_tenant_id"] = base64.b64encode(os.environ["TENANT_ID"].encode("ascii")).decode("ascii");
-data["data"]["azure_region"] = base64.b64encode(os.environ["AZURE_REGION"].encode("ascii")).decode("ascii");
-open(path, "w").write(yaml.dump(data, default_flow_style=False))'
-
-python3 -c '
-import yaml;
-path = "manifests/cluster-infrastructure-02-config.yml";
-data = yaml.full_load(open(path));
-data["status"]["platformStatus"]["azure"]["cloudName"] = "AzureStackCloud";
-open(path, "w").write(yaml.dump(data, default_flow_style=False))'
 
 # typical upi instruction
 python3 -c '
@@ -103,91 +40,60 @@ import yaml;
 path = "manifests/cluster-dns-02-config.yml";
 data = yaml.full_load(open(path));
 del data["spec"]["publicZone"];
-del data["spec"]["privateZone"];
 open(path, "w").write(yaml.dump(data, default_flow_style=False))'
-
-cat << EOF > openshift/99_openshift-machineconfig_99-master-azurestackcloud.yaml
-apiVersion: machineconfiguration.openshift.io/v1
-kind: MachineConfig
-metadata:
-  creationTimestamp: null
-  labels:
-    machineconfiguration.openshift.io/role: master
-  name: 99-master-azurestack
-spec:
-  config:
-    ignition:
-      config: {}
-      security:
-        tls: {}
-      timeouts: {}
-      version: 3.2.0
-    networkd: {}
-    passwd: {}
-    storage:
-      files:
-        - path: /etc/kubernetes/azurestackcloud.json
-          contents:
-            source: data:text/plain;charset=utf-8;base64,$(echo $azurestackjson | base64 | tr -d '\n')
-          mode: 420
-          user:
-            name: root
-    systemd:
-      units:
-        - name: kubelet.service
-          dropins:
-            - name: 10-azurestack.conf
-              contents: |
-                [Service]
-                Environment="AZURE_ENVIRONMENT_FILEPATH=/etc/kubernetes/azurestackcloud.json"
-  fips: false
-  kernelArguments: null
-  kernelType: ""
-  osImageURL: ""
-EOF
-
-cat << EOF > openshift/99_openshift-machineconfig_99-worker-azurestackcloud.yaml
-apiVersion: machineconfiguration.openshift.io/v1
-kind: MachineConfig
-metadata:
-  creationTimestamp: null
-  labels:
-    machineconfiguration.openshift.io/role: worker
-  name: 99-worker-azurestack
-spec:
-  config:
-    ignition:
-      config: {}
-      security:
-        tls: {}
-      timeouts: {}
-      version: 3.2.0
-    networkd: {}
-    passwd: {}
-    storage:
-      files:
-        - path: /etc/kubernetes/azurestackcloud.json
-          contents:
-            source: data:text/plain;charset=utf-8;base64,$(echo $azurestackjson | base64 | tr -d '\n')
-          mode: 420
-          user:
-            name: root
-    systemd:
-      units:
-        - name: kubelet.service
-          dropins:
-            - name: 10-azurestack.conf
-              contents: |
-                [Service]
-                Environment="AZURE_ENVIRONMENT_FILEPATH=/etc/kubernetes/azurestackcloud.json"
-  fips: false
-  kernelArguments: null
-  kernelType: ""
-  osImageURL: ""
-EOF
 
 INFRA_ID=$(yq r manifests/cluster-infrastructure-02-config.yml 'status.infrastructureName')
 RESOURCE_GROUP=$(yq r manifests/cluster-infrastructure-02-config.yml 'status.platformStatus.azure.resourceGroupName')
+
+
+
+cat >> "manifests/machine-api-credentials-secret.yaml" << EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: azure-cloud-credentials
+  namespace: openshift-machine-api
+stringData:
+  azure_subscription_id: "$SUBSCRIPTION_ID"
+  azure_client_id: "$AAD_CLIENT_ID"
+  azure_client_secret: "$AAD_CLIENT_SECRET"
+  azure_tenant_id: "$TENANT_ID"
+  azure_resource_prefix: "$INFRA_ID"
+  azure_resourcegroup: "$RESOURCE_GROUP"
+  azure_region: ppe3
+EOF
+
+cat >> "manifests/image-registry-credentials-secret.yaml" << EOF
+apiVersion: v1
+kind: Secret
+metadata:
+    name: installer-cloud-credentials
+    namespace: openshift-image-registry
+stringData:
+  azure_subscription_id: "$SUBSCRIPTION_ID"
+  azure_client_id: "$AAD_CLIENT_ID"
+  azure_client_secret: "$AAD_CLIENT_SECRET"
+  azure_tenant_id: "$TENANT_ID"
+  azure_resource_prefix: "$INFRA_ID"
+  azure_resourcegroup: "$RESOURCE_GROUP"
+  azure_region: ppe3
+EOF
+
+cat >> "manifests/ingress-operator-credentials-secret.yaml" << EOF
+apiVersion: v1
+kind: Secret
+metadata:
+    name: cloud-credentials
+    namespace: openshift-ingress-operator
+stringData:
+  azure_subscription_id: "$SUBSCRIPTION_ID"
+  azure_client_id: "$AAD_CLIENT_ID"
+  azure_client_secret: "$AAD_CLIENT_SECRET"
+  azure_tenant_id: "$TENANT_ID"
+  azure_resource_prefix: "$INFRA_ID"
+  azure_resourcegroup: "$RESOURCE_GROUP"
+  azure_region: ppe3
+EOF
 
 ${openshift_install} create ignition-configs
 
@@ -199,13 +105,11 @@ ACCOUNT_KEY=$(az storage account keys list -g "$RESOURCE_GROUP" --account-name "
 az storage container create --name files --account-name "${INFRA_ID}sa" --public-access blob --account-key "$ACCOUNT_KEY"
 az storage blob upload --account-name "${INFRA_ID}sa" --account-key "$ACCOUNT_KEY" -c "files" -f "bootstrap.ign" -n "bootstrap.ign"
 
-
 az deployment group create -g "$RESOURCE_GROUP" \
   --template-file "01_vnet.json" \
   --parameters baseName="$INFRA_ID"
 
-
-VHD_BLOB_URL="https://rhcossa.blob.ppe3.stackpoc.com/vhd/rhcos4.vhd"
+VHD_BLOB_URL="https://rhcossa.blob.ppe3.stackpoc.com/vhd/art-rhcos-ash.vhd"
 az deployment group create -g "$RESOURCE_GROUP" \
   --template-file "02_storage.json" \
   --parameters vhdBlobURL="$VHD_BLOB_URL" \
@@ -243,6 +147,17 @@ az deployment group create -g "$RESOURCE_GROUP" \
   --parameters masterVMSize="Standard_D4_v2" \
   --parameters diskSizeGB="1023" \
   --parameters diagnosticsStorageAccountName="${INFRA_ID}sa"
+
+${openshift_install} wait-for bootstrap-complete --log-level debug
+
+az network nsg rule delete -g "$RESOURCE_GROUP" --nsg-name "${INFRA_ID}"-nsg --name bootstrap_ssh_in
+az vm stop -g "$RESOURCE_GROUP" --name "${INFRA_ID}"-bootstrap
+az vm deallocate -g "$RESOURCE_GROUP" --name "${INFRA_ID}"-bootstrap
+az vm delete -g "$RESOURCE_GROUP" --name "${INFRA_ID}"-bootstrap --yes
+az disk delete -g "$RESOURCE_GROUP" --name "${INFRA_ID}"-bootstrap_OSDisk --no-wait --yes
+az network nic delete -g "$RESOURCE_GROUP" --name "${INFRA_ID}"-bootstrap-nic --no-wait
+az storage blob delete --account-key "$ACCOUNT_KEY" --account-name "${INFRA_ID}sa" --container-name files --name bootstrap.ign
+az network public-ip delete -g "$RESOURCE_GROUP" --name "${INFRA_ID}"-bootstrap-ssh-pip
 
 export WORKER_IGNITION=$(cat worker.ign | base64 | tr -d '\n')
 az deployment group create -g "$RESOURCE_GROUP" \
