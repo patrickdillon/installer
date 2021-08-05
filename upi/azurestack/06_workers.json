@@ -119,6 +119,7 @@
     "sshKeyPath" : "/home/core/.ssh/authorized_keys",
     "identityName" : "[concat(parameters('baseName'), '-identity')]",
     "imageName" : "[concat(parameters('baseName'), '-image')]",
+    "masterAvailabilitySetName" : "[concat(parameters('baseName'), '-master-avset')]",
     "numberOfNodes" : "[parameters('numberOfNodes')]",
     "vms" : {
       "copy" : [
@@ -181,6 +182,9 @@
         "[concat('Microsoft.Storage/storageAccounts/', parameters('diagnosticsStorageAccountName'))]"
       ],
       "properties" : {
+        "availabilitySet": {
+          "id": "[resourceId('Microsoft.Compute/availabilitySets',variables('masterAvailabilitySetName'))]"
+        },
         "hardwareProfile" : {
           "vmSize" : "[parameters('nodeVMSize')]"
         },
