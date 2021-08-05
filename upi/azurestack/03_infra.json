@@ -18,7 +18,7 @@
     "masterSubnetRef" : "[concat(variables('virtualNetworkID'), '/subnets/', variables('masterSubnetName'))]",
     "masterPublicIpAddressName" : "[concat(parameters('baseName'), '-master-pip')]",
     "masterPublicIpAddressID" : "[resourceId('Microsoft.Network/publicIPAddresses', variables('masterPublicIpAddressName'))]",
-    "masterLoadBalancerName" : "[concat(parameters('baseName'), '-public-lb')]",
+    "masterLoadBalancerName" : "[concat(parameters('baseName'))]",
     "masterLoadBalancerID" : "[resourceId('Microsoft.Network/loadBalancers', variables('masterLoadBalancerName'))]",
     "masterAvailabilitySetName" : "[concat(parameters('baseName'), '-master-avset')]",
     "internalLoadBalancerName" : "[concat(parameters('baseName'), '-internal-lb')]",
@@ -78,7 +78,7 @@
         ],
         "backendAddressPools" : [
           {
-            "name" : "public-lb-backend"
+            "name" : "[variables('masterLoadBalancerName')]"
           }
         ],
         "loadBalancingRules" : [
@@ -89,7 +89,7 @@
                 "id" :"[concat(variables('masterLoadBalancerID'), '/frontendIPConfigurations/public-lb-ip')]"
               },
               "backendAddressPool" : {
-                "id" : "[concat(variables('masterLoadBalancerID'), '/backendAddressPools/public-lb-backend')]"
+                "id" : "[concat(variables('masterLoadBalancerID'), '/backendAddressPools/', variables('masterLoadBalancerName'))]"
               },
               "protocol" : "Tcp",
               "loadDistribution" : "Default",
@@ -115,7 +115,7 @@
               "enableTcpReset" : false,
               "loadDistribution" : "Default",
               "backendAddressPool" : {
-                "id" : "[concat(variables('masterLoadBalancerID'), '/backendAddressPools/public-lb-backend')]"
+                "id" : "[concat(variables('masterLoadBalancerID'), '/backendAddressPools/', variables('masterLoadBalancerName'))]"
               },
               "probe" : {
                 "id" : "[concat(variables('masterLoadBalancerID'), '/probes/sint-probe')]"
