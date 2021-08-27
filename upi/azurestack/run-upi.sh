@@ -42,57 +42,43 @@ data = yaml.full_load(open(path));
 del data["spec"]["publicZone"];
 open(path, "w").write(yaml.dump(data, default_flow_style=False))'
 
-INFRA_ID=$(yq r manifests/cluster-infrastructure-02-config.yml 'status.infrastructureName')
-RESOURCE_GROUP=$(yq r manifests/cluster-infrastructure-02-config.yml 'status.platformStatus.azure.resourceGroupName')
+INFRA_ID=$(yq -r .status.infrastructureName manifests/cluster-infrastructure-02-config.yml)
+RESOURCE_GROUP=$(yq -r .status.platformStatus.azure.resourceGroupName manifests/cluster-infrastructure-02-config.yml)
 
-
-
-cat >> "manifests/machine-api-credentials-secret.yaml" << EOF
+oc adm release extract "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" --credentials-requests --cloud=azure --to=credentials-request
+files=$(ls credentials-request)
+for f in $files
+do
+  SECRET_NAME=$(python3 -c 'import yaml;data = yaml.full_load(open("credentials-request/'${f}'"));print(data["spec"]["secretRef"]["name"])')
+  SECRET_NAMESPACE=$(python3 -c 'import yaml;data = yaml.full_load(open("credentials-request/'${f}'"));print(data["spec"]["secretRef"]["namespace"])')
+  filename=${f/request/secret}
+  cat >> "manifests/$filename" << EOF
 apiVersion: v1
 kind: Secret
 metadata:
-  name: azure-cloud-credentials
-  namespace: openshift-machine-api
+    name: ${SECRET_NAME}
+    namespace: ${SECRET_NAMESPACE}
 stringData:
-  azure_subscription_id: "$SUBSCRIPTION_ID"
-  azure_client_id: "$AAD_CLIENT_ID"
-  azure_client_secret: "$AAD_CLIENT_SECRET"
-  azure_tenant_id: "$TENANT_ID"
-  azure_resource_prefix: "$INFRA_ID"
-  azure_resourcegroup: "$RESOURCE_GROUP"
-  azure_region: ppe3
+  azure_subscription_id: ${SUBSCRIPTION_ID}
+  azure_client_id: ${AAD_CLIENT_ID}
+  azure_client_secret: ${AAD_CLIENT_SECRET}
+  azure_tenant_id: ${TENANT_ID}
+  azure_resource_prefix: ${CLUSTER_NAME}
+  azure_resourcegroup: ${RESOURCE_GROUP}
+  azure_region: ${AZURE_REGION}
 EOF
+done
 
-cat >> "manifests/image-registry-credentials-secret.yaml" << EOF
+cat >> manifests/cco-configmap.yaml << EOF
 apiVersion: v1
-kind: Secret
+kind: ConfigMap
 metadata:
-    name: installer-cloud-credentials
-    namespace: openshift-image-registry
-stringData:
-  azure_subscription_id: "$SUBSCRIPTION_ID"
-  azure_client_id: "$AAD_CLIENT_ID"
-  azure_client_secret: "$AAD_CLIENT_SECRET"
-  azure_tenant_id: "$TENANT_ID"
-  azure_resource_prefix: "$INFRA_ID"
-  azure_resourcegroup: "$RESOURCE_GROUP"
-  azure_region: ppe3
-EOF
-
-cat >> "manifests/ingress-operator-credentials-secret.yaml" << EOF
-apiVersion: v1
-kind: Secret
-metadata:
-    name: cloud-credentials
-    namespace: openshift-ingress-operator
-stringData:
-  azure_subscription_id: "$SUBSCRIPTION_ID"
-  azure_client_id: "$AAD_CLIENT_ID"
-  azure_client_secret: "$AAD_CLIENT_SECRET"
-  azure_tenant_id: "$TENANT_ID"
-  azure_resource_prefix: "$INFRA_ID"
-  azure_resourcegroup: "$RESOURCE_GROUP"
-  azure_region: ppe3
+  name: cloud-credential-operator-config
+  namespace: openshift-cloud-credential-operator
+  annotations:
+    release.openshift.io/create-only: "true"
+data:
+  disabled: "true"
 EOF
 
 ${openshift_install} create ignition-configs
@@ -109,7 +95,7 @@ az deployment group create -g "$RESOURCE_GROUP" \
   --template-file "01_vnet.json" \
   --parameters baseName="$INFRA_ID"
 
-VHD_BLOB_URL="https://rhcossa.blob.ppe3.stackpoc.com/vhd/art-rhcos-ash.vhd"
+VHD_BLOB_URL="https://rhcossa.blob.ppe3.stackpoc.com/vhd/rhcos-49-84-202108221651.vhd"
 az deployment group create -g "$RESOURCE_GROUP" \
   --template-file "02_storage.json" \
   --parameters vhdBlobURL="$VHD_BLOB_URL" \
@@ -127,7 +113,7 @@ az network dns record-set a add-record -g "$RESOURCE_GROUP" -z "${CLUSTER_NAME}.
 az network dns record-set a add-record -g "$RESOURCE_GROUP" -z "${CLUSTER_NAME}.${BASE_DOMAIN}" -n api-int -a "$PUBLIC_IP" --ttl 60
 
 export BOOTSTRAP_URL=$(az storage blob url --account-name "${INFRA_ID}sa" --account-key "$ACCOUNT_KEY" -c "files" -n "bootstrap.ign" -o tsv)
-export BOOTSTRAP_IGNITION=$(jq -rcnM --arg v "3.1.0" --arg url "$BOOTSTRAP_URL" '{ignition:{version:$v,config:{replace:{source:$url}}}}' | base64 | tr -d '\n')
+export BOOTSTRAP_IGNITION=$(jq -rcnM --arg v "3.2.0" --arg url "$BOOTSTRAP_URL" '{ignition:{version:$v,config:{replace:{source:$url}}}}' | base64 | tr -d '\n')
 
 az deployment group create --verbose -g "$RESOURCE_GROUP" \
   --template-file "04_bootstrap.json" \
@@ -144,8 +130,6 @@ az deployment group create -g "$RESOURCE_GROUP" \
   --parameters masterIgnition="$MASTER_IGNITION" \
   --parameters sshKeyData="$SSH_KEY" \
   --parameters baseName="$INFRA_ID" \
-  --parameters masterVMSize="Standard_D4_v2" \
-  --parameters diskSizeGB="1023" \
   --parameters diagnosticsStorageAccountName="${INFRA_ID}sa"
 
 ${openshift_install} wait-for bootstrap-complete --log-level debug
