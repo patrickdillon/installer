@@ -1,11 +1,13 @@
 #!/bin/bash
-#export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=quay.io/padillon/ash-release-mirror:latest
-export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=registry.ci.openshift.org/ocp/release:4.9.0-0.ci-2021-08-03-115951
-export CLUSTER_NAME=$(yq r install-config.yaml metadata.name)
-export AZURE_REGION=ppe3
-export SSH_KEY=$(yq r install-config.yaml sshKey | xargs)
-export BASE_DOMAIN=$(yq r install-config.yaml baseDomain)
+export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=registry.ci.openshift.org/ocp/release:4.9.0-0.nightly-2021-08-26-040328
+export CLUSTER_NAME=$(yq -r .metadata.name install-config.yaml)
+export AZURE_REGION=$(yq -r .platform.azure.region install-config.yaml)
+export SSH_KEY=$(yq -r .sshKey install-config.yaml | xargs)
+export BASE_DOMAIN=$(yq -r .baseDomain install-config.yaml)
+export BASE_DOMAIN_RESOURCE_GROUP=$(yq -r .platform.azure.baseDomainResourceGroupName install-config.yaml)
 export TENANT_ID=$(az account show | jq -r .tenantId)
 export SUBSCRIPTION_ID=$(az account show | jq -r .id)
 export AAD_CLIENT_ID=$(jq -r .appId sp.json)
 export AAD_CLIENT_SECRET=$(jq -r .password sp.json)
+
+
