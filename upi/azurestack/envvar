@@ -1,5 +1,5 @@
 #!/bin/bash
-export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=registry.ci.openshift.org/ocp/release:4.9.0-0.nightly-2021-08-26-040328
+export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=quay.io/openshift-release-dev/ocp-release:4.9.0-rc.1-x86_64
 export CLUSTER_NAME=$(yq -r .metadata.name install-config.yaml)
 export AZURE_REGION=$(yq -r .platform.azure.region install-config.yaml)
 export SSH_KEY=$(yq -r .sshKey install-config.yaml | xargs)
