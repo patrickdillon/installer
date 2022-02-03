@@ -54,10 +54,17 @@ resource "azurestack_virtual_machine" "master" {
   storage_os_disk {
     name              = "${var.cluster_id}-master-${count.index}_OSDisk" # os disk name needs to match cluster-api convention
     create_option     = "FromImage"
-    disk_size_gb      = min(var.os_volume_size, 1023)
-    managed_disk_type = "Standard_LRS"
+    disk_size_gb      = min(var.os_volume_size, 128)
+    managed_disk_type = "Premium_LRS"
   }
 
+  storage_data_disk {
+     name              = "${var.cluster_id}-master-${count.index}_etcdDisk"
+     create_option     = "Empty"
+     disk_size_gb      = min(var.os_volume_size, 128)
+     managed_disk_type = "Premium_LRS"
+     lun               = 0
+  }
   boot_diagnostics {
     enabled     = true
     storage_uri = var.storage_account.primary_blob_endpoint
