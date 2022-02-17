@@ -9,6 +9,7 @@ import (
 	"github.com/openshift/installer/pkg/types/aws"
 	"github.com/openshift/installer/pkg/types/azure"
 	"github.com/openshift/installer/pkg/types/baremetal"
+	"github.com/openshift/installer/pkg/types/cloudprovider"
 	"github.com/openshift/installer/pkg/types/gcp"
 	"github.com/openshift/installer/pkg/types/ibmcloud"
 	"github.com/openshift/installer/pkg/types/libvirt"
@@ -103,10 +104,6 @@ type InstallConfig struct {
 	// Platform is the configuration for the specific platform upon which to
 	// perform the installation.
 	Platform `json:"platform"`
-
-	// CloudProvider is the configuration for the specific platform upon which to
-	// perform the installation.
-	CloudProvider CloudProvider `json:"cloudProvider"`
 
 	// PullSecret is the secret to use when pulling images.
 	PullSecret string `json:"pullSecret"`
@@ -216,6 +213,15 @@ type Platform struct {
 	// Ovirt is the configuration used when installing on oVirt.
 	// +optional
 	Ovirt *ovirt.Platform `json:"ovirt,omitempty"`
+
+	// CloudProvider embeds a plugin that implements the CloudProvider interface.
+	// TODO: if all in-tree platforms implement the CloudProvider interface it
+	// (probably) wouldn't be necessary to have the extra `plugin` object in the yaml:
+	//  platform:      platform:
+	//    plugin:   ->   acme:
+	//      acme:
+	// This might also be implementable with a custom unmarshaler for platform.
+	*cloudprovider.CloudProvider `json:"plugin,omitempty"`
 }
 
 // Name returns a string representation of the platform (e.g. "aws" if
@@ -247,6 +253,8 @@ func (p *Platform) Name() string {
 		return vsphere.Name
 	case p.Ovirt != nil:
 		return ovirt.Name
+	case p.CloudProvider != nil:
+		return cloudprovider.CloudProviderName
 	default:
 		return ""
 	}

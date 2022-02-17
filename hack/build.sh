@@ -21,7 +21,7 @@ GOFLAGS="${GOFLAGS:--mod=vendor}"
 LDFLAGS="${LDFLAGS} -X github.com/openshift/installer/pkg/version.Raw=${GIT_TAG} -X github.com/openshift/installer/pkg/version.Commit=${GIT_COMMIT} -X github.com/openshift/installer/pkg/version.defaultArch=${DEFAULT_ARCH}"
 TAGS="${TAGS:-}"
 OUTPUT="${OUTPUT:-bin/openshift-install}"
-export CGO_ENABLED=0
+export CGO_ENABLED=1
 
 case "${MODE}" in
 release)
