@@ -23,6 +23,10 @@ import (
 	"github.com/openshift/installer/pkg/asset/installconfig"
 	assetstore "github.com/openshift/installer/pkg/asset/store"
 	"github.com/openshift/installer/pkg/asset/tls"
+	"github.com/openshift/installer/pkg/gather"
+	_ "github.com/openshift/installer/pkg/gather/aws"
+	_ "github.com/openshift/installer/pkg/gather/azure"
+	_ "github.com/openshift/installer/pkg/gather/gcp"
 	"github.com/openshift/installer/pkg/gather/service"
 	"github.com/openshift/installer/pkg/gather/ssh"
 	platformstages "github.com/openshift/installer/pkg/terraform/stages/platform"
@@ -62,7 +66,7 @@ func newGatherBootstrapCmd() *cobra.Command {
 		Run: func(_ *cobra.Command, _ []string) {
 			cleanup := setupFileHook(rootOpts.dir)
 			defer cleanup()
-			bundlePath, err := runGatherBootstrapCmd(rootOpts.dir)
+			serialBundlePath, bundlePath, err := runGatherBootstrapCmd(rootOpts.dir)
 			if err != nil {
 				logrus.Fatal(err)
 			}
@@ -73,6 +77,7 @@ func newGatherBootstrapCmd() *cobra.Command {
 				}
 			}
 
+			logrus.Infof("Serial Bootstrap gather logs captured here %q", serialBundlePath)
 			logrus.Infof("Bootstrap gather logs captured here %q", bundlePath)
 		},
 	}
@@ -83,26 +88,26 @@ func newGatherBootstrapCmd() *cobra.Command {
 	return cmd
 }
 
-func runGatherBootstrapCmd(directory string) (string, error) {
+func runGatherBootstrapCmd(directory string) (string, string, error) {
 	assetStore, err := assetstore.NewStore(directory)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to create asset store")
+		return "", "", errors.Wrap(err, "failed to create asset store")
 	}
 	// add the default bootstrap key pair to the sshKeys list
 	bootstrapSSHKeyPair := &tls.BootstrapSSHKeyPair{}
 	if err := assetStore.Fetch(bootstrapSSHKeyPair); err != nil {
-		return "", errors.Wrapf(err, "failed to fetch %s", bootstrapSSHKeyPair.Name())
+		return "", "", errors.Wrapf(err, "failed to fetch %s", bootstrapSSHKeyPair.Name())
 	}
 	tmpfile, err := ioutil.TempFile("", "bootstrap-ssh")
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	defer os.Remove(tmpfile.Name())
 	if _, err := tmpfile.Write(bootstrapSSHKeyPair.Private()); err != nil {
-		return "", err
+		return "", "", err
 	}
 	if err := tmpfile.Close(); err != nil {
-		return "", err
+		return "", "", err
 	}
 	gatherBootstrapOpts.sshKeys = append(gatherBootstrapOpts.sshKeys, tmpfile.Name())
 
@@ -112,13 +117,13 @@ func runGatherBootstrapCmd(directory string) (string, error) {
 	if bootstrap == "" && len(masters) == 0 {
 		config := &installconfig.InstallConfig{}
 		if err := assetStore.Fetch(config); err != nil {
-			return "", errors.Wrapf(err, "failed to fetch %s", config.Name())
+			return "", "", errors.Wrapf(err, "failed to fetch %s", config.Name())
 		}
 
 		for _, stage := range platformstages.StagesForPlatform(config.Config.Platform.Name()) {
 			stageBootstrap, stagePort, stageMasters, err := stage.ExtractHostAddresses(directory, config.Config)
 			if err != nil {
-				return "", err
+				return "", "", err
 			}
 			if stageBootstrap != "" {
 				bootstrap = stageBootstrap
@@ -132,38 +137,53 @@ func runGatherBootstrapCmd(directory string) (string, error) {
 		}
 
 		if bootstrap == "" || len(masters) == 0 {
-			return "", errors.New("bootstrap host address and at least one control plane host address must be provided")
+			return "", "", errors.New("bootstrap host address and at least one control plane host address must be provided")
 		}
 	} else if bootstrap == "" || len(masters) == 0 {
-		return "", errors.New("must provide both bootstrap host address and at least one control plane host address when providing one")
+		return "", "", errors.New("must provide both bootstrap host address and at least one control plane host address when providing one")
 	}
 
 	return gatherBootstrap(bootstrap, port, masters, directory)
 }
 
-func gatherBootstrap(bootstrap string, port int, masters []string, directory string) (string, error) {
+func gatherBootstrap(bootstrap string, port int, masters []string, directory string) (string, string, error) {
+	gatherID := time.Now().Format("20060102150405")
+
+	serialLogBundle := filepath.Join(directory, fmt.Sprintf("serial-log-bundle-%s.tar.gz", gatherID))
+	serialLogBundlePath, err := filepath.Abs(serialLogBundle)
+
+	logrus.Info("Pulling platform specific console logs from the bootstrap machine")
+	gather, err := gather.New(logrus.StandardLogger(), serialLogBundle, bootstrap, masters, directory)
+	if err != nil {
+		return "", "", errors.Wrap(err, "Failed to create gather object")
+	}
+	err = gather.Run()
+	if err != nil {
+		logrus.Infof("%s: Failed to gather platform specific logs", err.Error())
+	}
+
 	logrus.Info("Pulling debug logs from the bootstrap machine")
 	client, err := ssh.NewClient("core", net.JoinHostPort(bootstrap, strconv.Itoa(port)), gatherBootstrapOpts.sshKeys)
 	if err != nil {
 		if errors.Is(err, syscall.ECONNREFUSED) || errors.Is(err, syscall.ETIMEDOUT) {
 			return "", errors.Wrap(err, "failed to connect to the bootstrap machine")
 		}
-		return "", errors.Wrap(err, "failed to create SSH client")
+		return "", "", errors.Wrap(err, "failed to create SSH client")
 	}
 
-	gatherID := time.Now().Format("20060102150405")
 	if err := ssh.Run(client, fmt.Sprintf("/usr/local/bin/installer-gather.sh --id %s %s", gatherID, strings.Join(masters, " "))); err != nil {
-		return "", errors.Wrap(err, "failed to run remote command")
+		return "", "", errors.Wrap(err, "failed to run remote command")
 	}
 	file := filepath.Join(directory, fmt.Sprintf("log-bundle-%s.tar.gz", gatherID))
 	if err := ssh.PullFileTo(client, fmt.Sprintf("/home/core/log-bundle-%s.tar.gz", gatherID), file); err != nil {
-		return "", errors.Wrap(err, "failed to pull log file from remote")
+		return "", "", errors.Wrap(err, "failed to pull log file from remote")
 	}
-	path, err := filepath.Abs(file)
+	logBundlePath, err := filepath.Abs(file)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to stat log file")
+		return "", "", errors.Wrap(err, "failed to stat log file")
 	}
-	return path, nil
+
+	return serialLogBundlePath, logBundlePath, nil
 }
 
 func logClusterOperatorConditions(ctx context.Context, config *rest.Config) error {

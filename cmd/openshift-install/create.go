@@ -113,7 +113,7 @@ var (
 
 				timer.StartTimer("Bootstrap Complete")
 				if err := waitForBootstrapComplete(ctx, config); err != nil {
-					bundlePath, gatherErr := runGatherBootstrapCmd(rootOpts.dir)
+					serialBundlePath, bundlePath, gatherErr := runGatherBootstrapCmd(rootOpts.dir)
 					if gatherErr != nil {
 						logrus.Error("Attempted to gather debug logs after installation failure: ", gatherErr)
 					}
@@ -126,6 +126,7 @@ var (
 						if err := service.AnalyzeGatherBundle(bundlePath); err != nil {
 							logrus.Error("Attempted to analyze the debug logs after installation failure: ", err)
 						}
+						logrus.Infof("Serial Bootstrap gather logs captured here %q", serialBundlePath)
 						logrus.Infof("Bootstrap gather logs captured here %q", bundlePath)
 					}
 					logrus.Fatal("Bootstrap failed to complete")
