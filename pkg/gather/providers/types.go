@@ -13,4 +13,4 @@ type Gather interface {
 }
 
 // NewFunc is an interface for creating platform-specific gather methods.
-type NewFunc func(logger logrus.FieldLogger, serialLogBundle string, bootstrap string, masters []string, metadata *types.ClusterMetadata) (Gather, error)
+type NewFunc func(logger logrus.FieldLogger, serialLogBundle, bootstrapIP, bootstrapID string, masterIPs, masterIDs []string, metadata *types.ClusterMetadata) (Gather, error)

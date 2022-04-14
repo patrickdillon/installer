@@ -93,12 +93,12 @@ func runGatherBootstrapCmd(directory string) (string, string, error) {
 	if err != nil {
 		return "", "", errors.Wrap(err, "failed to create asset store")
 	}
-	// add the default bootstrap key pair to the sshKeys list
+	// add the default bootstrapIP key pair to the sshKeys list
 	bootstrapSSHKeyPair := &tls.BootstrapSSHKeyPair{}
 	if err := assetStore.Fetch(bootstrapSSHKeyPair); err != nil {
 		return "", "", errors.Wrapf(err, "failed to fetch %s", bootstrapSSHKeyPair.Name())
 	}
-	tmpfile, err := ioutil.TempFile("", "bootstrap-ssh")
+	tmpfile, err := ioutil.TempFile("", "bootstrapIP-ssh")
 	if err != nil {
 		return "", "", err
 	}
@@ -111,49 +111,60 @@ func runGatherBootstrapCmd(directory string) (string, string, error) {
 	}
 	gatherBootstrapOpts.sshKeys = append(gatherBootstrapOpts.sshKeys, tmpfile.Name())
 
-	bootstrap := gatherBootstrapOpts.bootstrap
+	bootstrapIP := gatherBootstrapOpts.bootstrap
 	port := 22
-	masters := gatherBootstrapOpts.masters
-	if bootstrap == "" && len(masters) == 0 {
+	masterIPs := gatherBootstrapOpts.masters
+	var bootstrapID string
+	var masterIDs []string
+	if bootstrapIP == "" && len(masterIPs) == 0 {
 		config := &installconfig.InstallConfig{}
 		if err := assetStore.Fetch(config); err != nil {
 			return "", "", errors.Wrapf(err, "failed to fetch %s", config.Name())
 		}
 
 		for _, stage := range platformstages.StagesForPlatform(config.Config.Platform.Name()) {
-			stageBootstrap, stagePort, stageMasters, err := stage.ExtractHostAddresses(directory, config.Config)
+			stageBootstrapIP, stagePort, stageMasterIPs, err := stage.ExtractHostAddresses(directory, config.Config)
 			if err != nil {
 				return "", "", err
 			}
-			if stageBootstrap != "" {
-				bootstrap = stageBootstrap
+			if stageBootstrapIP != "" {
+				bootstrapIP = stageBootstrapIP
 			}
 			if stagePort != 0 {
 				port = stagePort
 			}
-			if len(stageMasters) > 0 {
-				masters = stageMasters
+			if len(stageMasterIPs) > 0 {
+				masterIPs = stageMasterIPs
+			}
+
+			//TODO: Seems like this logic could be refactored into a closure
+			stageBootstrapID, stageMasterIDs, err := stage.ExtractHostIDs(directory, config.Config)
+			if stageBootstrapID != "" {
+				bootstrapID = stageBootstrapID
+			}
+			if len(stageMasterIDs) > 0 {
+				masterIDs = stageMasterIDs
 			}
 		}
 
-		if bootstrap == "" || len(masters) == 0 {
+		if bootstrapIP == "" || len(masterIPs) == 0 {
 			return "", "", errors.New("bootstrap host address and at least one control plane host address must be provided")
 		}
-	} else if bootstrap == "" || len(masters) == 0 {
+	} else if bootstrapIP == "" || len(masterIPs) == 0 {
 		return "", "", errors.New("must provide both bootstrap host address and at least one control plane host address when providing one")
 	}
 
-	return gatherBootstrap(bootstrap, port, masters, directory)
+	return gatherBootstrap(bootstrapIP, bootstrapID, port, masterIPs, masterIDs, directory)
 }
 
-func gatherBootstrap(bootstrap string, port int, masters []string, directory string) (string, string, error) {
+func gatherBootstrap(bootstrapIP, bootstrapID string, port int, masterIPs, masterIDs []string, directory string) (string, string, error) {
 	gatherID := time.Now().Format("20060102150405")
 
 	serialLogBundle := filepath.Join(directory, fmt.Sprintf("serial-log-bundle-%s.tar.gz", gatherID))
 	serialLogBundlePath, err := filepath.Abs(serialLogBundle)
 
 	logrus.Info("Pulling platform specific console logs from the bootstrap machine")
-	gather, err := gather.New(logrus.StandardLogger(), serialLogBundle, bootstrap, masters, directory)
+	gather, err := gather.New(logrus.StandardLogger(), serialLogBundle, bootstrapIP, bootstrapID, masterIPs, masterIDs, directory)
 	if err != nil {
 		return "", "", errors.Wrap(err, "Failed to create gather object")
 	}
@@ -163,15 +174,15 @@ func gatherBootstrap(bootstrap string, port int, masters []string, directory str
 	}
 
 	logrus.Info("Pulling debug logs from the bootstrap machine")
-	client, err := ssh.NewClient("core", net.JoinHostPort(bootstrap, strconv.Itoa(port)), gatherBootstrapOpts.sshKeys)
+	client, err := ssh.NewClient("core", net.JoinHostPort(bootstrapIP, strconv.Itoa(port)), gatherBootstrapOpts.sshKeys)
 	if err != nil {
 		if errors.Is(err, syscall.ECONNREFUSED) || errors.Is(err, syscall.ETIMEDOUT) {
-			return "", errors.Wrap(err, "failed to connect to the bootstrap machine")
+			return "", "", errors.Wrap(err, "failed to connect to the bootstrapIP machine")
 		}
 		return "", "", errors.Wrap(err, "failed to create SSH client")
 	}
 
-	if err := ssh.Run(client, fmt.Sprintf("/usr/local/bin/installer-gather.sh --id %s %s", gatherID, strings.Join(masters, " "))); err != nil {
+	if err := ssh.Run(client, fmt.Sprintf("/usr/local/bin/installer-gather.sh --id %s %s", gatherID, strings.Join(masterIPs, " "))); err != nil {
 		return "", "", errors.Wrap(err, "failed to run remote command")
 	}
 	file := filepath.Join(directory, fmt.Sprintf("log-bundle-%s.tar.gz", gatherID))

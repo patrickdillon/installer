@@ -42,7 +42,7 @@ type Gather struct {
 }
 
 // New returns an Azure Gather from ClusterMetadata.
-func New(logger logrus.FieldLogger, serialLogBundle string, bootstrap string, masters []string, metadata *types.ClusterMetadata) (providers.Gather, error) {
+func New(logger logrus.FieldLogger, serialLogBundle, bootstrap, bootstrapID string, masters, masterIDs []string, metadata *types.ClusterMetadata) (providers.Gather, error) {
 	cloudName := metadata.Azure.CloudName
 	if cloudName == "" {
 		cloudName = azure.PublicCloud

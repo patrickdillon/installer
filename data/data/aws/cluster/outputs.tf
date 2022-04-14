@@ -2,6 +2,9 @@ output "control_plane_ips" {
   value = module.masters.ip_addresses
 }
 
+output "control_plane_ids" {
+  value = module.masters.ids
+}
 output "lb_target_group_arns" {
   value = module.vpc.aws_lb_target_group_arns
 }

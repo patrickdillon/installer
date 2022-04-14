@@ -36,8 +36,10 @@ type Gather struct {
 	logger          logrus.FieldLogger
 	filters         []Filter
 	region          string
-	bootstrap       string
-	masters         []string
+	bootstrapIP     string
+	masterIPs       []string
+	bootstrapID     string
+	masterIDs       []string
 	directory       string
 	serialLogBundle string
 
@@ -47,7 +49,7 @@ type Gather struct {
 	session *session.Session
 }
 
-func New(logger logrus.FieldLogger, serialLogBundle string, bootstrap string, masters []string, metadata *types.ClusterMetadata) (providers.Gather, error) {
+func New(logger logrus.FieldLogger, serialLogBundle, bootstrapIP, bootstrapID string, masterIPs, masterIDs []string, metadata *types.ClusterMetadata) (providers.Gather, error) {
 	filters := make([]Filter, 0, len(metadata.ClusterPlatformMetadata.AWS.Identifier))
 	for _, filter := range metadata.ClusterPlatformMetadata.AWS.Identifier {
 		filters = append(filters, filter)
@@ -67,8 +69,10 @@ func New(logger logrus.FieldLogger, serialLogBundle string, bootstrap string, ma
 		filters:         filters,
 		session:         session,
 		serialLogBundle: serialLogBundle,
-		bootstrap:       bootstrap,
-		masters:         masters,
+		bootstrapIP:     bootstrapIP,
+		masterIPs:       masterIPs,
+		bootstrapID:     bootstrapID,
+		masterIDs:       masterIDs,
 		directory:       filepath.Dir(serialLogBundle),
 	}, nil
 }
@@ -88,12 +92,17 @@ func (g *Gather) Run() error {
 	}
 	awsSession.Handlers.Build.PushBackNamed(request.NamedHandler{
 		Name: "openshiftInstaller.OpenshiftInstallerUserAgentHandler",
-		Fn:   request.MakeAddToUserAgentHandler("OpenShift/4.x Destroyer", version.Raw),
+		Fn:   request.MakeAddToUserAgentHandler("OpenShift/4.x Gather", version.Raw),
 	})
 
 	ec2Client := ec2.New(awsSession)
 
-	instances, err := g.getInstanceIDs(ctx, ec2Client)
+	//instances, err := g.getInstanceIDs(ctx, ec2Client)
+	//if err != nil {
+	//	return err
+	//}
+
+	instances, err := g.getInstancesByID(ctx, ec2Client, g.bootstrapID, g.masterIDs)
 	if err != nil {
 		return err
 	}
@@ -190,6 +199,43 @@ func (g *Gather) getInstanceIDs(ctx context.Context, ec2Client *ec2.EC2) ([]*ec2
 		}
 	}
 
+	return instances, nil
+}
+
+func (g *Gather) getInstancesByID(ctx context.Context, ec2Client *ec2.EC2, bootstrapID string, mastersID []string) ([]*ec2.Instance, error) {
+	if ec2Client.Config.Region == nil {
+		return nil, errors.New("EC2 client does not have region configured")
+	}
+
+	iIDs := []*string{}
+	for _, v := range append(mastersID, bootstrapID) {
+		iIDs = append(iIDs, aws.String(v))
+	}
+
+	dii := &ec2.DescribeInstancesInput{InstanceIds: iIDs}
+
+	var instances []*ec2.Instance
+	fn := func(results *ec2.DescribeInstancesOutput, lastPage bool) bool {
+		for _, reservation := range results.Reservations {
+			if reservation.OwnerId == nil {
+				continue
+			}
+
+			for _, instance := range reservation.Instances {
+				// if instance.InstanceId == nil || instance.State == nil {
+				// 	continue
+				// }
+				if instance.InstanceId != nil {
+					instances = append(instances, instance)
+				}
+			}
+		}
+		return !lastPage
+	}
+
+	if err := ec2Client.DescribeInstancesPagesWithContext(ctx, dii, fn); err != nil {
+		return nil, errors.Wrap(err, "failure getting instances")
+	}
 	return instances, nil
 }
 

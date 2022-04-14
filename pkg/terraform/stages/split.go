@@ -52,7 +52,7 @@ func WithCustomBootstrapDestroy(destroy DestroyFunc) StageOption {
 }
 
 // WithCustomExtractHostAddresses returns an option for specifying that a split stage should use a custom extract host addresses process.
-func WithCustomExtractHostAddresses(extractHostAddresses ExtractFunc) StageOption {
+func WithCustomExtractHostAddresses(extractHostAddresses ExtractIPFunc) StageOption {
 	return func(s *SplitStage) {
 		s.extractHostAddresses = extractHostAddresses
 	}
@@ -65,14 +65,17 @@ type SplitStage struct {
 	providers            []providers.Provider
 	destroyWithBootstrap bool
 	destroy              DestroyFunc
-	extractHostAddresses ExtractFunc
+	extractHostAddresses ExtractIPFunc
 }
 
 // DestroyFunc is a function for destroying the stage.
 type DestroyFunc func(s SplitStage, directory string, varFiles []string) error
 
-// ExtractFunc is a function for extracting host addresses.
-type ExtractFunc func(s SplitStage, directory string, ic *types.InstallConfig) (string, int, []string, error)
+// ExtractIPFunc is a function for extracting host addresses.
+type ExtractIPFunc func(s SplitStage, directory string, ic *types.InstallConfig) (string, int, []string, error)
+
+// ExtractIDFunc is a function for extracting host IDs.
+type ExtractIDFunc func(s SplitStage, directory string, ic *types.InstallConfig) (string, []string, error)
 
 // Name implements pkg/terraform/Stage.Name
 func (s SplitStage) Name() string {
@@ -110,6 +113,11 @@ func (s SplitStage) ExtractHostAddresses(directory string, ic *types.InstallConf
 		return s.extractHostAddresses(s, directory, ic)
 	}
 	return normalExtractHostAddresses(s, directory, ic)
+}
+
+// ExtractHostIDs implements pkg/terraform/Stage.ExtractHostIDs
+func (s SplitStage) ExtractHostIDs(directory string, ic *types.InstallConfig) (string, []string, error) {
+	return normalExtractHostIDs(s, directory, ic)
 }
 
 // GetTerraformOutputs reads the terraform outputs file for the stage and parses it into a map of outputs.
@@ -163,6 +171,39 @@ func normalExtractHostAddresses(s SplitStage, directory string, _ *types.Install
 	}
 
 	return bootstrap, 0, masters, nil
+}
+
+func normalExtractHostIDs(s SplitStage, directory string, _ *types.InstallConfig) (string, []string, error) {
+	outputs, err := GetTerraformOutputs(s, directory)
+	if err != nil {
+		return "", nil, err
+	}
+
+	var bootstrap string
+	if bootstrapRaw, ok := outputs["bootstrap_id"]; ok {
+		bootstrap, ok = bootstrapRaw.(string)
+		if !ok {
+			return "", nil, errors.New("could not read bootstrap VM ID from terraform outputs")
+		}
+	}
+
+	var masters []string
+	if mastersRaw, ok := outputs["control_plane_ids"]; ok {
+		mastersSlice, ok := mastersRaw.([]interface{})
+		if !ok {
+			return "", nil, errors.New("could not read control plane VM IDs from terraform outputs")
+		}
+		masters = make([]string, len(mastersSlice))
+		for i, idRaw := range mastersSlice {
+			id, ok := idRaw.(string)
+			if !ok {
+				return "", nil, errors.New("could not convert control plane VM ID from terraform outputs")
+			}
+			masters[i] = id
+		}
+	}
+
+	return bootstrap, masters, nil
 }
 
 func normalDestroy(s SplitStage, directory string, varFiles []string) error {

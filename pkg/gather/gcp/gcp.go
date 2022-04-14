@@ -11,7 +11,7 @@ import (
 type Gather struct {
 }
 
-func New(logger logrus.FieldLogger, serialLogBundle string, bootstrap string, masters []string, metadata *types.ClusterMetadata) (providers.Gather, error) {
+func New(logger logrus.FieldLogger, serialLogBundle, bootstrapIP, bootstrapID string, masterIPs, masterIDs []string, metadata *types.ClusterMetadata) (providers.Gather, error) {
 	return &Gather{}, nil
 }
 

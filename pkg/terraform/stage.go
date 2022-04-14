@@ -28,4 +28,7 @@ type Stage interface {
 
 	// ExtractHostAddresses extracts the IPs of the bootstrap and control plane machines.
 	ExtractHostAddresses(directory string, config *types.InstallConfig) (bootstrap string, port int, masters []string, err error)
+
+	// ExtractHostIDs extracts the IDs of the bootstrap and control plane machines.
+	ExtractHostIDs(directory string, config *types.InstallConfig) (bootstrap string, masters []string, err error)
 }

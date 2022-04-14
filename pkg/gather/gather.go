@@ -14,7 +14,7 @@ import (
 )
 
 // New returns a Gather based on `metadata.json` in `rootDir`.
-func New(logger logrus.FieldLogger, serialLogBundle string, bootstrap string, masters []string, rootDir string) (providers.Gather, error) {
+func New(logger logrus.FieldLogger, serialLogBundle string, bootstrapIP, bootstrapID string, masterIPs, masterIDs []string, rootDir string) (providers.Gather, error) {
 	metadata, err := cluster.LoadMetadata(rootDir)
 	if err != nil {
 		return nil, err
@@ -29,7 +29,7 @@ func New(logger logrus.FieldLogger, serialLogBundle string, bootstrap string, ma
 	if !ok {
 		return nil, errors.Errorf("no gather methods registered for %q", platform)
 	}
-	return creator(logger, serialLogBundle, bootstrap, masters, metadata)
+	return creator(logger, serialLogBundle, bootstrapIP, bootstrapID, masterIDs, masterIDs, metadata)
 }
 
 // CreateArchive creates a gzipped tar file.
