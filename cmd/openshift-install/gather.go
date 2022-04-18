@@ -1,9 +1,13 @@
 package main
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"context"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -194,7 +198,11 @@ func gatherBootstrap(bootstrapIP, bootstrapID string, port int, masterIPs, maste
 		return "", "", errors.Wrap(err, "failed to stat log file")
 	}
 
-	return serialLogBundlePath, logBundlePath, nil
+	combinedLogBundlePath, err := appendLogs(logBundlePath, serialLogBundle, directory, gatherID)
+	if err != nil {
+		return "", "", errors.Wrap(err, "failed to combine log bundles")
+	}
+	return serialLogBundlePath, combinedLogBundlePath, nil
 }
 
 func logClusterOperatorConditions(ctx context.Context, config *rest.Config) error {
@@ -226,4 +234,56 @@ func logClusterOperatorConditions(ctx context.Context, config *rest.Config) erro
 	}
 
 	return nil
+}
+
+// append adds the serial bundle to the end of the gather bundle in a single gzipped archive.
+func appendLogs(gb, sb, dir, gatherID string) (string, error) {
+	logrus.Info("Combining serial and bootstrap log bundles")
+	file := filepath.Join(dir, fmt.Sprintf("combined-log-bundle-%s.tar.gz", gatherID))
+	bundlePath, err := filepath.Abs(file)
+	zf, err := os.Create(bundlePath)
+	if err != nil {
+		return "", err
+	}
+	zw := gzip.NewWriter(zf)
+	tw := tar.NewWriter(zw)
+
+	for _, v := range []string{gb, sb} {
+		fmt.Printf("===Opening %s=== \n", v)
+		f, err := os.Open(v)
+		if err != nil {
+			return "", errors.Wrapf(err, "error opening %s to combine log bundles", v)
+		}
+
+		zr, err := gzip.NewReader(f)
+		if err != nil {
+			return "", errors.Wrapf(err, "error creating gzip reader for %s", v)
+		}
+
+		tr := tar.NewReader(zr)
+		for {
+			hdr, err := tr.Next()
+			if err == io.EOF {
+				break // End of archive
+			}
+			if err != nil {
+				return "", errors.Wrapf(err, "error reading contents of %s", v)
+			}
+			if err := tw.WriteHeader(hdr); err != nil {
+				log.Fatal(err)
+			}
+			if _, err := io.Copy(tw, tr); err != nil {
+				log.Fatal(err)
+			}
+			fmt.Println(hdr)
+		}
+	}
+
+	if err := tw.Close(); err != nil {
+		return "", errors.Wrap(err, "error closing tar writer")
+	}
+	if err := zw.Close(); err != nil {
+		return "", errors.Wrap(err, "error closing zip writer")
+	}
+	return bundlePath, nil
 }
