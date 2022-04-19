@@ -269,6 +269,12 @@ func appendLogs(gb, sb, dir, gatherID string) (string, error) {
 			if err != nil {
 				return "", errors.Wrapf(err, "error reading contents of %s", v)
 			}
+
+			//TODO hack
+			if v == sb {
+				tmpHdr := strings.SplitN(hdr.Name, "/", 3)[2]
+				hdr.Name = fmt.Sprintf("log-bundle-%s/serial-logs/%s", gatherID, tmpHdr)
+			}
 			if err := tw.WriteHeader(hdr); err != nil {
 				log.Fatal(err)
 			}
