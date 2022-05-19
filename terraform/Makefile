@@ -3,7 +3,8 @@ TFSUBDIRS:=	$(foreach DIR,$(shell find providers -maxdepth 1 -mindepth 1 -type d
 GO_MOD_TIDY_TARGETS:=	$(foreach DIR,$(TFSUBDIRS), $(subst $(DIR),go-mod-tidy-vendor.$(DIR),$(DIR)))
 GO_BUILD_TARGETS:=	$(foreach DIR,$(TFSUBDIRS), $(subst $(DIR),go-build.$(DIR),$(DIR)))
 GO_CLEAN_TARGETS:=	$(foreach DIR,$(TFSUBDIRS), $(subst $(DIR),go-clean.$(DIR),$(DIR)))
-TERRAFORM_PROVIDER_TARGETS := $(foreach DIR,$(TFSUBDIRS), bin/terraform-provider-$(DIR).zip)
+TERRAFORM_PROVIDER_BINARIES := $(foreach DIR,$(TFSUBDIRS), bin/terraform-provider-$(DIR))
+TERRAFORM_PROVIDER_ARCHIVES := $(foreach DIR,$(TFSUBDIRS), bin/terraform-provider-$(DIR).zip)
 
 LDFLAGS:= "-s -w"
 
@@ -21,11 +22,13 @@ $(GO_MOD_TIDY_TARGETS): go-mod-tidy-vendor.%:
 go-build: $(GO_BUILD_TARGETS) go-build-terraform
 $(GO_BUILD_TARGETS): go-build.%: bin/terraform-provider-%.zip
 
-$(TERRAFORM_PROVIDER_TARGETS): bin/terraform-provider-%.zip: providers/%/go.mod
+$(TERRAFORM_PROVIDER_BINARIES): bin/terraform-provider-%: providers/%/go.mod
 	cd providers/$*; \
 	if [ -f main.go ]; then path="."; else path=./vendor/`grep _ tools.go|awk '{ print $$2 }'|sed 's|"||g'`; fi; \
 	go build -ldflags $(LDFLAGS) -o ../../bin/terraform-provider-$* "$$path"; \
-	zip -1j ../../bin/terraform-provider-$*.zip ../../bin/terraform-provider-$*;
+
+$(TERRAFORM_PROVIDER_ARCHIVES): bin/terraform-provider-%.zip: bin/terraform-provider-%
+	zip -1j ./bin/terraform-provider-$*.zip ./bin/terraform-provider-$* &
 
 .PHONY: go-build-terraform
 go-build-terraform: bin/terraform
