@@ -55,6 +55,7 @@ func (h *fileHook) Fire(entry *logrus.Entry) error {
 	if h.truncateAtNewLine {
 		msgs = strings.Split(orig, "\n")
 	}
+	entry = entry.WithField("myKey", "myValue")
 
 	for _, msg := range msgs {
 		// this makes it easier to call format on entry
