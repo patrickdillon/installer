@@ -734,18 +734,26 @@ func getCOProgressingStatus(ctx context.Context, cc *configclient.Clientset, nam
 			case watch.Added, watch.Modified:
 				cos, ok := event.Object.(*configv1.ClusterOperator)
 				if !ok {
+					// DO NOT MERGE: CI DEBUGGING ONLY
+					logrus.Debugf("Cluster Operator %s status not found", name)
 					return false, nil
 				}
 				progressing := cov1helpers.FindStatusCondition(cos.Status.Conditions, configv1.OperatorProgressing)
 				if progressing == nil {
+					// DO NOT MERGE: CI DEBUGGING ONLY
+					logrus.Debugf("Cluster Operator %s progressing == nil", name)
 					return false, nil
 				}
 				pStatus = progressing
 
 				if progressing.Status == configv1.ConditionFalse &&
 					time.Since(progressing.LastTransitionTime.Time).Seconds() > coStabilityThreshold {
+					// DO NOT MERGE: CI DEBUGGING ONLY
+					logrus.Debugf("Cluster Operator %s is stable", name)
 					return true, nil
 				}
+				// DO NOT MERGE: CI DEBUGGING ONLY
+				logrus.Debugf("Cluster Operator %s is Progressing=%s LastTransitionTime=%v DurationSinceTransition=%.fs Reason=%s Message=%s", name, progressing.Status, progressing.LastTransitionTime.Time, time.Since(progressing.LastTransitionTime.Time).Seconds(), progressing.Reason, progressing.Message)
 			}
 			return false, nil
 		},
