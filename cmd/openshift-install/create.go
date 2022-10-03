@@ -551,7 +551,7 @@ func waitForInitializedCluster(ctx context.Context, config *rest.Config) error {
 func waitForStableOperators(ctx context.Context, config *rest.Config) error {
 	timer.StartTimer("Cluster Operators Stable")
 
-	stabilityCheckDuration := 5 * time.Minute
+	stabilityCheckDuration := 10 * time.Minute
 	stabilityContext, cancel := context.WithTimeout(ctx, stabilityCheckDuration)
 	defer cancel()
 
