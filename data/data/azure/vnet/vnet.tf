@@ -17,6 +17,7 @@ resource "azurerm_subnet" "master_subnet" {
   ] : cidr.value if cidr.include]
   virtual_network_name = local.virtual_network
   name                 = var.azure_control_plane_subnet
+  service_endpoints    = ["Microsoft.Storage"]
 }
 
 resource "azurerm_subnet" "worker_subnet" {
@@ -29,4 +30,5 @@ resource "azurerm_subnet" "worker_subnet" {
   ] : cidr.value if cidr.include]
   virtual_network_name = local.virtual_network
   name                 = var.azure_compute_subnet
+  service_endpoints    = ["Microsoft.Storage"]
 }
