@@ -65,6 +65,10 @@ output "subnet_id" {
 output "storage_account_name" {
   value = azurerm_storage_account.cluster.name
 }
+        
+output "storage_account_id" {
+  value = azurerm_storage_account.cluster.id
+}
 
 output "outbound_udr" {
   value = var.azure_outbound_user_defined_routing

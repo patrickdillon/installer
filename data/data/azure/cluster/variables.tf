@@ -52,6 +52,11 @@ variable "master_subnet_id" {
   description = "The subnet ID for the bootstrap node."
 }
 
+variable "worker_subnet_id" {
+  type        = string
+  description = "The subnet ID for the bootstrap node."
+}
+
 variable "nsg_name" {
   type        = string
   description = "The network security group for the subnet."
@@ -65,6 +70,11 @@ variable "resource_group_name" {
 variable "storage_account_name" {
   type        = string
   description = "the name of the storage account for the cluster. It can be used for boot diagnostics."
+}
+
+variable "storage_account_id" {
+  type        = string
+  description = "the id of the storage account for the cluster. It can be used for boot diagnostics."
 }
 
 variable "vm_image" {

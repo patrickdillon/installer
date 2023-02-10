@@ -69,3 +69,10 @@ module "dns" {
   use_ipv4 = var.use_ipv4
   use_ipv6 = var.use_ipv6
 }
+
+resource "azurerm_storage_account_network_rules" "storage_network_rules" {
+  storage_account_id = var.storage_account_id
+  default_action             = "Deny"
+  virtual_network_subnet_ids = [var.master_subnet_id, var.worker_subnet_id]
+  bypass                     = ["Logging", "AzureServices", "Metrics"]
+}

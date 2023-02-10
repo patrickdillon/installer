@@ -88,19 +88,6 @@ resource "azurerm_storage_blob" "rhcos_image" {
   metadata               = tomap({ source_uri = var.azure_image_url })
 }
 
-resource "azurerm_storage_account_network_rules" "storage_network_rules" {
-  count = var.azure_preexisting_network ? 0 : 1
-  storage_account_id = azurerm_storage_account.cluster.id
-
-default_action             = "Deny"
-  virtual_network_subnet_ids = concat(
-    [for subnet in azurerm_subnet.master_subnet: subnet.id],
-    [for subnet in azurerm_subnet.worker_subnet: subnet.id]
-  )
-  ip_rules                   = ["76.149.106.35"]
-  bypass                     = ["Logging", "AzureServices", "Metrics"]
-}
-
 # Creates Shared Image Gallery
 # https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/shared_image_gallery
 resource "azurerm_shared_image_gallery" "sig" {
