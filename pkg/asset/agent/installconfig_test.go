@@ -103,7 +103,11 @@ platform:
 pullSecret: "{\"auths\":{\"example.com\":{\"auth\":\"authorization value\"}}}"
 `,
 			expectedFound: false,
+<<<<<<< HEAD
 			expectedError: "failed to create install config: invalid \"install-config.yaml\" file: [platform.vsphere.apiVIPs: Invalid value: \"192.168.122.10\": IP expected to be in one of the machine networks: 10.0.0.0/16, platform.vsphere.ingressVIPs: Required value: must specify VIP for ingress, when VIP for API is set, platform.vsphere.vCenter: Required value: must specify the name of the vCenter, platform.vsphere.username: Required value: must specify the username, platform.vsphere.password: Required value: must specify the password, platform.vsphere.datacenter: Required value: must specify the datacenter, platform.vsphere.defaultDatastore: Required value: must specify the default datastore]",
+=======
+			expectedError: `invalid install-config configuration: platform.vsphere.ingressVIPs: Required value: must specify VIP for ingress, when VIP for API is set`,
+>>>>>>> 0504c55cb5 (Relax MachineCIDR check for vSphere, Nutanix)
 		},
 		{
 			name: "invalid configuration for none platform for sno",
