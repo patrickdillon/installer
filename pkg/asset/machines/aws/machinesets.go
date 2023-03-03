@@ -4,6 +4,7 @@ package aws
 import (
 	"fmt"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,7 +39,8 @@ func MachineSets(clusterID string, region string, subnets icaws.Subnets, pool *t
 		if len(subnets) > 0 && !ok {
 			return nil, errors.Errorf("no subnet for zone %s", az)
 		}
-
+		spew.Dump(subnets)
+		spew.Dump(subnet)
 		privateSubnet := !subnet.Public
 		instanceType := mpool.InstanceType
 		nodeLabels := make(map[string]string, 3)

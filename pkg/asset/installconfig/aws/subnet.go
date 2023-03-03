@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
@@ -60,6 +61,7 @@ type SubnetGroups struct {
 
 // subnets retrieves metadata for the given subnet(s).
 func subnets(ctx context.Context, session *session.Session, region string, ids []string) (subnetGroups SubnetGroups, err error) {
+	spew.Println("DEBUG subnets")
 	metas := make(map[string]Subnet, len(ids))
 	zoneNames := make([]*string, len(ids))
 	availabilityZones := make(map[string]*ec2.AvailabilityZone, len(ids))
@@ -193,6 +195,8 @@ func subnets(ctx context.Context, session *session.Session, region string, ids [
 		// Subnet is grouped by default as private
 		subnetGroups.Private[id] = meta
 	}
+	spew.Println("====DEBUG=====")
+	spew.Dump(subnetGroups)
 	return subnetGroups, nil
 }
 
