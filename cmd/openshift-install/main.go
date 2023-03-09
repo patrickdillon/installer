@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -12,6 +13,8 @@ import (
 	terminal "golang.org/x/term"
 	"k8s.io/klog"
 	klogv2 "k8s.io/klog/v2"
+
+	configv1 "github.com/openshift/api/config/v1"
 )
 
 var (
@@ -75,12 +78,13 @@ func newRootCmd() *cobra.Command {
 	}
 	cmd.PersistentFlags().StringVar(&rootOpts.dir, "dir", ".", "assets directory")
 	cmd.PersistentFlags().StringVar(&rootOpts.logLevel, "log-level", "info", "log level (e.g. \"debug | info | warn | error\")")
-	cmd.PersistentFlags().StringVar(&rootOpts.featureSet, "feature-set", "Default", "feature set to enable during install and on the installed cluster")
+	cmd.PersistentFlags().StringVar(&rootOpts.featureSet, "feature-set", "", "feature set to enable during install and on the installed cluster")
 	return cmd
 }
 
 func runRootCmd(cmd *cobra.Command, args []string) {
 	setupLogging()
+	validateFeatureSet()
 }
 
 func setupLogging() {
@@ -105,6 +109,21 @@ func setupLogging() {
 	}))
 
 	if err != nil {
-		logrus.Fatal(errors.Wrap(err, "invalid log-level"))
+		logrus.Fatal(errors.Wrap(err, "Invalid log-level"))
+	}
+}
+
+func validateFeatureSet() {
+	fs := configv1.FeatureSet(rootOpts.featureSet)
+	if _, ok := configv1.FeatureSets[fs]; !ok {
+		sortedFeatureSets := func() []string {
+			v := []string{}
+			for n := range configv1.FeatureSets {
+				v = append(v, string(n))
+			}
+			sort.Strings(v)
+			return v
+		}()
+		logrus.Fatalf("Invalid --feature-set flag %q: supported values: %q", fs, sortedFeatureSets)
 	}
 }
