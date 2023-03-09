@@ -127,3 +127,15 @@ func validateFeatureSet() {
 		logrus.Fatalf("Invalid --feature-set flag %q: supported values: %q", fs, sortedFeatureSets)
 	}
 }
+
+// gateOnTechPreviewNoUpgrade is a helper function that can be added
+// (e.g. as a PreRun command) to an existing cobra command to prevent it
+// from running unless --feature-set TechPreviewNoUpgrade is set.
+func gateCmdOn(fs configv1.FeatureSet) func(*cobra.Command, []string) {
+	return func(cmd *cobra.Command, _ []string) {
+		if configv1.FeatureSet(rootOpts.featureSet) != fs {
+			//TO DO: Line break and link to feature set docs
+			logrus.Fatalf("The %q command is in a non-default feature set: to opt in use the flag --feature-set %s", cmd.Use, fs)
+		}
+	}
+}
