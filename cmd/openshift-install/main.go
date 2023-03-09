@@ -16,8 +16,9 @@ import (
 
 var (
 	rootOpts struct {
-		dir      string
-		logLevel string
+		dir        string
+		logLevel   string
+		featureSet string
 	}
 )
 
@@ -74,6 +75,7 @@ func newRootCmd() *cobra.Command {
 	}
 	cmd.PersistentFlags().StringVar(&rootOpts.dir, "dir", ".", "assets directory")
 	cmd.PersistentFlags().StringVar(&rootOpts.logLevel, "log-level", "info", "log level (e.g. \"debug | info | warn | error\")")
+	cmd.PersistentFlags().StringVar(&rootOpts.featureSet, "feature-set", "Default", "feature set to enable during install and on the installed cluster")
 	return cmd
 }
 
