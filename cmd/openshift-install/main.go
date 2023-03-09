@@ -80,6 +80,10 @@ func newRootCmd() *cobra.Command {
 }
 
 func runRootCmd(cmd *cobra.Command, args []string) {
+	setupLogging()
+}
+
+func setupLogging() {
 	logrus.SetOutput(io.Discard)
 	logrus.SetLevel(logrus.TraceLevel)
 
