@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/spf13/cobra"
 
+	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/installer/cmd/openshift-install/agent"
 	"github.com/openshift/installer/pkg/asset"
 	"github.com/openshift/installer/pkg/asset/agent/agentconfig"
@@ -72,9 +73,10 @@ var (
 	agentPXEFilesTarget = target{
 		name: "Agent PXE Files",
 		command: &cobra.Command{
-			Use:   "pxe-files",
-			Short: "Generates PXE bootable image files containing all the information needed to deploy a cluster",
-			Args:  cobra.ExactArgs(0),
+			Use:    "pxe-files",
+			Short:  "Generates PXE bootable image files containing all the information needed to deploy a cluster",
+			Args:   cobra.ExactArgs(0),
+			PreRun: gateCmdOn(configv1.TechPreviewNoUpgrade),
 		},
 		assets: []asset.WritableAsset{
 			&image.AgentPXEFiles{},
