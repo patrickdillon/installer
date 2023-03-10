@@ -286,6 +286,7 @@ func runTargetCmd(targets ...asset.WritableAsset) func(cmd *cobra.Command, args 
 		defer cleanup()
 
 		cluster.InstallDir = rootOpts.dir
+		installconfig.FeatureSetFlag = rootOpts.featureSet
 
 		err := runner(rootOpts.dir)
 		if err != nil {

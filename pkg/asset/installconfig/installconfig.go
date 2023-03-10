@@ -39,6 +39,9 @@ type InstallConfig struct {
 
 var _ asset.WritableAsset = (*InstallConfig)(nil)
 
+// FeatureSetFlag is the feature set passed through the --feature-set CLI flag.
+var FeatureSetFlag string
+
 // MakeAsset returns an InstallConfig asset containing a given InstallConfig CR.
 func MakeAsset(config *types.InstallConfig) *InstallConfig {
 	return &InstallConfig{
