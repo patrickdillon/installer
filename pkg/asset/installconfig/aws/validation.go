@@ -18,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
+	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/installer/pkg/rhcos"
 	"github.com/openshift/installer/pkg/types"
 	awstypes "github.com/openshift/installer/pkg/types/aws"
@@ -378,6 +379,9 @@ var requiredServices = []string{
 // ValidateForProvisioning validates if the install config is valid for provisioning the cluster.
 func ValidateForProvisioning(client API, ic *types.InstallConfig, metadata *Metadata) error {
 	if ic.Publish == types.InternalPublishingStrategy && ic.AWS.HostedZone == "" {
+		return nil
+	}
+	if *ic.AWS.LoadBalancer == configv1.LoadBalancerTypeUserManaged {
 		return nil
 	}
 
