@@ -302,6 +302,8 @@ func (t *TerraformVariables) Generate(parents asset.Parents) error {
 			WorkerIAMRoleName:     workerIAMRoleName,
 			Architecture:          installConfig.Config.ControlPlane.Architecture,
 			Proxy:                 installConfig.Config.Proxy,
+			IntLB:                 installConfig.Config.AWS.IntLBName,
+			ExtLB:                 installConfig.Config.AWS.ExtLBName,
 		})
 		if err != nil {
 			return errors.Wrapf(err, "failed to get %s Terraform variables", platform)
