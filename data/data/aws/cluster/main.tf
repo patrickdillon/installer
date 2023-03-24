@@ -60,6 +60,7 @@ module "iam" {
 
 module "dns" {
   source = "./route53"
+  count = var.aws_ext_lb_name == null ? 1 : 0
 
   api_external_lb_dns_name = module.vpc.aws_lb_api_external_dns_name
   api_external_lb_zone_id  = module.vpc.aws_lb_api_external_zone_id
@@ -85,6 +86,8 @@ module "vpc" {
   public_subnets   = var.aws_public_subnets
   private_subnets  = var.aws_private_subnets
   publish_strategy = var.aws_publish_strategy
+  ext_lb           = var.aws_ext_lb_name
+  int_lb           = var.aws_int_lb_name
 
   availability_zones = distinct(
     concat(

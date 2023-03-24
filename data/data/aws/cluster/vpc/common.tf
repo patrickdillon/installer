@@ -3,6 +3,7 @@
 
 locals {
   public_endpoints = var.publish_strategy == "External" ? true : false
+  byo_lbs          = var.ext_lb == null ? false : true
   description      = "Created By OpenShift Installer"
 }
 
@@ -23,4 +24,12 @@ data "aws_subnet" "private" {
   count = var.private_subnets == null ? length(var.availability_zones) : length(var.private_subnets)
 
   id = var.private_subnets == null ? aws_subnet.private_subnet[count.index].id : var.private_subnets[count.index]
+}
+
+data "aws_lb" "ext" {
+  name = local.byo_lbs ? var.ext_lb : aws_lb.api_external[0].name
+}
+
+data "aws_lb" "int" {
+  name = local.byo_lbs ? var.int_lb : aws_lb.api_internal[0].name
 }

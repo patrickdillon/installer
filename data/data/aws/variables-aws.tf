@@ -167,3 +167,15 @@ variable "aws_worker_iam_role_name" {
   description = "The name of the IAM role that will be attached to worker instances."
   default = ""
 }
+
+variable "aws_int_lb_name" {
+  type = string
+  description = "The name of the internal load balancer in a BYO LB scenario"
+  default = null
+}
+
+variable "aws_ext_lb_name" {
+  type = string
+  description = "The name of the external load balancer in a BYO LB scenario"
+  default = null
+}
