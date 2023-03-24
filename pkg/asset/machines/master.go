@@ -264,7 +264,16 @@ func (m *Master) Generate(dependencies asset.Parents) error {
 		if err != nil {
 			return errors.Wrap(err, "failed to create master machine objects")
 		}
-		aws.ConfigMasters(machines, controlPlaneMachineSet, clusterID.InfraID, ic.Publish)
+
+		intLB := fmt.Sprintf("%s-int", clusterID)
+		if installConfig.Config.AWS.IntLBName != "" {
+			intLB = installConfig.Config.AWS.IntLBName
+		}
+		extLB := fmt.Sprintf("%s-ext", clusterID)
+		if installConfig.Config.AWS.ExtLBName != "" {
+			extLB = installConfig.Config.AWS.ExtLBName
+		}
+		aws.ConfigMasters(machines, controlPlaneMachineSet, intLB, extLB, ic.Publish)
 	case gcptypes.Name:
 		mpool := defaultGCPMachinePoolPlatform()
 		mpool.Set(ic.Platform.GCP.DefaultMachinePlatform)

@@ -263,15 +263,15 @@ func tagsFromUserTags(clusterID string, usertags map[string]string) ([]machineap
 }
 
 // ConfigMasters sets the PublicIP flag and assigns a set of load balancers to the given machines
-func ConfigMasters(machines []machineapi.Machine, controlPlane *machinev1.ControlPlaneMachineSet, clusterID string, publish types.PublishingStrategy) {
+func ConfigMasters(machines []machineapi.Machine, controlPlane *machinev1.ControlPlaneMachineSet, intLB, extLB string, publish types.PublishingStrategy) {
 	lbrefs := []machineapi.LoadBalancerReference{{
-		Name: fmt.Sprintf("%s-int", clusterID),
+		Name: intLB,
 		Type: machineapi.NetworkLoadBalancerType,
 	}}
 
 	if publish == types.ExternalPublishingStrategy {
 		lbrefs = append(lbrefs, machineapi.LoadBalancerReference{
-			Name: fmt.Sprintf("%s-ext", clusterID),
+			Name: extLB,
 			Type: machineapi.NetworkLoadBalancerType,
 		})
 	}
