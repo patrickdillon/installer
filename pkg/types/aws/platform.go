@@ -92,6 +92,21 @@ type Platform struct {
 	//
 	// +optional
 	LBType configv1.AWSLBType `json:"lbType,omitempty"`
+
+	// TODO: It seems like we should be able to discover the load balancers.
+	// If this is used only with BYO DNS, we could discover the load balancers
+	// by checking that the users have defined their DNS records. And then look
+	// up the load balancer based on the resolved DNS record
+	ExtLBName string `json:"extLBName"`
+
+	// See comment for ExtLBName.
+	IntLBName string `json:"intLBName"`
+
+	// TODO: I wasn't aware of the LBType field. Apparently
+	// that is for ingress load balancer. If we want to use the new LB
+	// API in openshift/api established by openstack, we may want to consider
+	// that LBType is a confusing name.
+	LoadBalancer *configv1.PlatformLoadBalancerType `json:"loadBalancer,omitempty"`
 }
 
 // ServiceEndpoint store the configuration for services to
