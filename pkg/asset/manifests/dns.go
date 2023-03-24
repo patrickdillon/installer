@@ -100,6 +100,9 @@ func (d *DNS) Generate(dependencies asset.Parents) error {
 			Tags: map[string]string{"type": "private"},
 		}
 	case awstypes.Name:
+		if *installConfig.Config.AWS.LoadBalancer == configv1.LoadBalancerTypeUserManaged {
+			break
+		}
 		if installConfig.Config.Publish == types.ExternalPublishingStrategy {
 			sess, err := installConfig.AWS.Session(context.TODO())
 			if err != nil {
