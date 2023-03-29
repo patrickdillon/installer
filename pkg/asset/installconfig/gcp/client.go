@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	googleoauth "golang.org/x/oauth2/google"
 	"google.golang.org/api/cloudresourcemanager/v1"
 	compute "google.golang.org/api/compute/v1"
@@ -30,6 +31,7 @@ type API interface {
 	GetMachineType(ctx context.Context, project, zone, machineType string) (*compute.MachineType, error)
 	GetPublicDomains(ctx context.Context, project string) ([]string, error)
 	GetPublicDNSZone(ctx context.Context, project, baseDomain string) (*dns.ManagedZone, error)
+	GetPrivateDNSZone(ctx context.Context, project, baseDomain, vpc string) (*dns.ManagedZone, error)
 	GetDNSZoneByName(ctx context.Context, project, zoneName string) (*dns.ManagedZone, error)
 	GetSubnetworks(ctx context.Context, network, project, region string) ([]*compute.Subnetwork, error)
 	GetProjects(ctx context.Context) (map[string]string, error)
@@ -165,6 +167,37 @@ func (c *Client) GetPublicDNSZone(ctx context.Context, project, baseDomain strin
 	}
 	if res == nil {
 		return nil, errors.New("no matching public DNS Zone found")
+	}
+	return res, nil
+}
+
+// GetPrivateDNSZone returns a private DNS zone based on the basedomain and network.
+func (c *Client) GetPrivateDNSZone(ctx context.Context, project, baseDomain, vpc string) (*dns.ManagedZone, error) {
+	ctx, cancel := context.WithTimeout(context.TODO(), 1*time.Minute)
+	defer cancel()
+
+	svc, err := c.getDNSService(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !strings.HasSuffix(baseDomain, ".") {
+		baseDomain = fmt.Sprintf("%s.", baseDomain)
+	}
+	req := svc.ManagedZones.List(project).DnsName(baseDomain).Context(ctx)
+	var res *dns.ManagedZone
+	if err := req.Pages(ctx, func(page *dns.ManagedZonesListResponse) error {
+		for idx, v := range page.ManagedZones {
+			if v.Visibility == "private" {
+				res = page.ManagedZones[idx]
+			}
+		}
+		return nil
+	}); err != nil {
+		return nil, errors.Wrap(err, "failed to list DNS Zones")
+	}
+	if res == nil {
+		logrus.Debug("")
+		return nil, nil
 	}
 	return res, nil
 }

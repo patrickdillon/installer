@@ -112,6 +112,21 @@ func (mr *MockAPIMockRecorder) GetNetwork(ctx, network, project interface{}) *go
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNetwork", reflect.TypeOf((*MockAPI)(nil).GetNetwork), ctx, network, project)
 }
 
+// GetPrivateDNSZone mocks base method.
+func (m *MockAPI) GetPrivateDNSZone(ctx context.Context, project, baseDomain, vpc string) (*dns.ManagedZone, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPrivateDNSZone", ctx, project, baseDomain, vpc)
+	ret0, _ := ret[0].(*dns.ManagedZone)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetPrivateDNSZone indicates an expected call of GetPrivateDNSZone.
+func (mr *MockAPIMockRecorder) GetPrivateDNSZone(ctx, project, baseDomain, vpc interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPrivateDNSZone", reflect.TypeOf((*MockAPI)(nil).GetPrivateDNSZone), ctx, project, baseDomain, vpc)
+}
+
 // GetProjectPermissions mocks base method.
 func (m *MockAPI) GetProjectPermissions(ctx context.Context, project string, permissions []string) (sets.Set[string], error) {
 	m.ctrl.T.Helper()
