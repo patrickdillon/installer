@@ -367,7 +367,7 @@ func TestValidatePreExistingPublicDNS(t *testing.T) {
 			gcpClient.EXPECT().GetPublicDNSZone(gomock.Any(), "project-id", "base-domain").Return(&dns.ManagedZone{Name: "zone-name"}, nil).AnyTimes()
 			gcpClient.EXPECT().GetRecordSets(gomock.Any(), gomock.Eq("project-id"), gomock.Eq("zone-name")).Return(test.records, nil).AnyTimes()
 
-			err := ValidatePreExistingPublicDNS(gcpClient, &types.InstallConfig{
+			err := validatePreExistingPublicDNS(gcpClient, &types.InstallConfig{
 				ObjectMeta: metav1.ObjectMeta{Name: "cluster-name"},
 				BaseDomain: "base-domain",
 				Platform:   types.Platform{GCP: &gcp.Platform{ProjectID: "project-id"}},
@@ -484,6 +484,50 @@ func TestValidateCredentialMode(t *testing.T) {
 				err = ValidateCredentialMode(gcpClientWithCreds, &ic)
 			}
 
+			if test.err == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.Regexp(t, test.err, err)
+			}
+		})
+	}
+}
+
+func TestValidatePrivateDNSZone(t *testing.T) {
+	cases := []struct {
+		name    string
+		records []*dns.ResourceRecordSet
+		err     string
+	}{{
+		name:    "no pre-existing",
+		records: nil,
+	}, {
+		name:    "no pre-existing",
+		records: []*dns.ResourceRecordSet{{Name: "api.another-cluster-name.base-domain."}},
+	}, {
+		name:    "pre-existing",
+		records: []*dns.ResourceRecordSet{{Name: "api.cluster-name.base-domain."}},
+		err:     `^metadata\.name: Invalid value: "cluster-name": record api\.cluster-name\.base-domain\. already exists in DNS Zone \(project-id/zone-name\) and might be in use by another cluster, please remove it to continue$`,
+	}, {
+		name:    "pre-existing",
+		records: []*dns.ResourceRecordSet{{Name: "api.cluster-name.base-domain."}, {Name: "api.cluster-name.base-domain."}},
+		err:     `^metadata\.name: Invalid value: "cluster-name": record api\.cluster-name\.base-domain\. already exists in DNS Zone \(project-id/zone-name\) and might be in use by another cluster, please remove it to continue$`,
+	}}
+
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+			gcpClient := mock.NewMockAPI(mockCtrl)
+
+			gcpClient.EXPECT().GetPrivateDNSZone(gomock.Any(), "project-id", "base-domain", "shared-vpc").Return(&dns.ManagedZone{Name: "zone-name"}, nil).AnyTimes()
+			gcpClient.EXPECT().GetRecordSets(gomock.Any(), gomock.Eq("project-id"), gomock.Eq("zone-name")).Return(test.records, nil).AnyTimes()
+
+			err := validatePrivateDNSZone(gcpClient, &types.InstallConfig{
+				ObjectMeta: metav1.ObjectMeta{Name: "cluster-name"},
+				BaseDomain: "base-domain",
+				Platform:   types.Platform{GCP: &gcp.Platform{ProjectID: "project-id", Network: "shared-vpc"}},
+			})
 			if test.err == "" {
 				assert.NoError(t, err)
 			} else {

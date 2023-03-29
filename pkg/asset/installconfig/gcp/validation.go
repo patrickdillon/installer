@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	compute "google.golang.org/api/compute/v1"
+	dns "google.golang.org/api/dns/v1"
 	"google.golang.org/api/googleapi"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -114,17 +115,15 @@ func validateInstanceTypes(client API, ic *types.InstallConfig) field.ErrorList 
 	return allErrs
 }
 
-// ValidatePreExistingPublicDNS ensure no pre-existing DNS record exists in the public
+// validatePreExistingPublicDNS ensure no pre-existing DNS record exists in the public
 // DNS zone for cluster's Kubernetes API. If a PublicDNSZone is provided, the provided
 // zone is verified against the BaseDomain. If no zone is provided, the base domain is
 // checked for any public zone that can be used.
-func ValidatePreExistingPublicDNS(client API, ic *types.InstallConfig) error {
+func validatePreExistingPublicDNS(client API, ic *types.InstallConfig) *field.Error {
 	// If this is an internal cluster, this check is not necessary
 	if ic.Publish == types.InternalPublishingStrategy {
 		return nil
 	}
-
-	record := fmt.Sprintf("api.%s.", strings.TrimSuffix(ic.ClusterDomain(), "."))
 
 	zone, err := client.GetPublicDNSZone(context.TODO(), ic.Platform.GCP.ProjectID, ic.BaseDomain)
 	if err != nil {
@@ -136,7 +135,32 @@ func ValidatePreExistingPublicDNS(client API, ic *types.InstallConfig) error {
 		}
 		return field.InternalError(field.NewPath("baseDomain"), err)
 	}
+	return checkRecordSets(client, ic, zone)
+}
 
+// validatePrivateDNS ensures that an existing private zone, if it
+// exists, does not have conflicting existing DNS records.
+func validatePrivateDNSZone(client API, ic *types.InstallConfig) *field.Error {
+	// We only need to validate existing private DNS zones when installing to an existing network.
+	if ic.GCP.Network == "" {
+		return nil
+	}
+
+	zone, err := client.GetPrivateDNSZone(context.TODO(), ic.GCP.ProjectID, ic.BaseDomain, ic.GCP.Network)
+	if err != nil {
+		var gErr *googleapi.Error
+		if errors.As(err, &gErr) {
+			if gErr.Code == http.StatusNotFound {
+				return field.NotFound(field.NewPath("baseDomain"), fmt.Sprintf("DNS Zone (%s/%s)", ic.Platform.GCP.ProjectID, ic.BaseDomain))
+			}
+		}
+		return field.InternalError(field.NewPath("baseDomain"), err)
+	}
+	return checkRecordSets(client, ic, zone)
+}
+
+func checkRecordSets(client API, ic *types.InstallConfig, zone *dns.ManagedZone) *field.Error {
+	record := fmt.Sprintf("api.%s.", strings.TrimSuffix(ic.ClusterDomain(), "."))
 	rrSets, err := client.GetRecordSets(context.TODO(), ic.GCP.ProjectID, zone.Name)
 	if err != nil {
 		return field.InternalError(field.NewPath("baseDomain"), err)
@@ -335,4 +359,24 @@ func validateCredentialMode(client API, ic *types.InstallConfig) field.ErrorList
 	}
 
 	return allErrs
+}
+
+// ValidateForProvisioning validates that the install config is valid for provisioning the cluster.
+func ValidateForProvisioning(ic *types.InstallConfig) error {
+	allErrs := field.ErrorList{}
+
+	client, err := NewClient(context.TODO())
+	if err != nil {
+		return err
+	}
+
+	if err := validatePreExistingPublicDNS(client, ic); err != nil {
+		allErrs = append(allErrs, err)
+	}
+
+	if err := validatePrivateDNSZone(client, ic); err != nil {
+		allErrs = append(allErrs, err)
+	}
+
+	return allErrs.ToAggregate()
 }
