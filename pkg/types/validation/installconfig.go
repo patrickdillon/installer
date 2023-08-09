@@ -31,6 +31,7 @@ import (
 	azurevalidation "github.com/openshift/installer/pkg/types/azure/validation"
 	"github.com/openshift/installer/pkg/types/baremetal"
 	baremetalvalidation "github.com/openshift/installer/pkg/types/baremetal/validation"
+	"github.com/openshift/installer/pkg/types/featuregates"
 	"github.com/openshift/installer/pkg/types/gcp"
 	gcpvalidation "github.com/openshift/installer/pkg/types/gcp/validation"
 	"github.com/openshift/installer/pkg/types/ibmcloud"
@@ -1051,6 +1052,16 @@ func validateFeatureSet(c *types.InstallConfig) field.ErrorList {
 			allErrs = append(allErrs, field.Forbidden(field.NewPath("featureGates"), "featureGates can only be used with the CustomNoUpgrade feature set"))
 		}
 		allErrs = append(allErrs, validateCustomFeatureGates(c)...)
+	}
+
+	featureGates, err := featuregates.GetFeatureGates(c.FeatureSet, c.FeatureGates...)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("featureSet"), c.FeatureSet, err.Error()))
+	} else {
+		if c.GCP != nil {
+			err := gcpvalidation.ValidateGCPLabelsTagsFeature(featureGates, c)
+			allErrs = append(allErrs, err...)
+		}
 	}
 
 	if c.FeatureSet != configv1.TechPreviewNoUpgrade {

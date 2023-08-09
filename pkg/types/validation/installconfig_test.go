@@ -2092,8 +2092,8 @@ func TestValidateInstallConfig(t *testing.T) {
 				c := validInstallConfig()
 				c.FeatureSet = configv1.CustomNoUpgrade
 				c.FeatureGates = []string{
-					"CustomFeature1=True",
-					"CustomFeature2=False",
+					"OpenShiftPodSecurityAdmission=True",
+					"CloudDualStackNodeIPs=False",
 				}
 				return c
 			}(),
@@ -2104,12 +2104,12 @@ func TestValidateInstallConfig(t *testing.T) {
 				c := validInstallConfig()
 				c.FeatureSet = configv1.CustomNoUpgrade
 				c.FeatureGates = []string{
-					"CustomFeature1=True",
-					"CustomFeature2",
+					"OpenShiftPodSecurityAdmission=True",
+					"CloudDualStackNodeIPs",
 				}
 				return c
 			}(),
-			expectedError: `featureGates\[1\]: Invalid value: "CustomFeature2": must match the format <feature-name>=<bool>`,
+			expectedError: `featureGates\[1\]: Invalid value: "CloudDualStackNodeIPs": must match the format <feature-name>=<bool>`,
 		},
 		{
 			name: "invalid custom features bool",
@@ -2117,12 +2117,11 @@ func TestValidateInstallConfig(t *testing.T) {
 				c := validInstallConfig()
 				c.FeatureSet = configv1.CustomNoUpgrade
 				c.FeatureGates = []string{
-					"CustomFeature1=foo",
-					"CustomFeature2=False",
+					"OpenShiftPodSecurityAdmission=foo",
 				}
 				return c
 			}(),
-			expectedError: `featureGates\[0\]: Invalid value: "CustomFeature1=foo": must match the format <feature-name>=<bool>, could not parse boolean value`,
+			expectedError: `featureGates\[0\]: Invalid value: "OpenShiftPodSecurityAdmission=foo": must match the format <feature-name>=<bool>, could not parse boolean value`,
 		},
 		{
 			name: "custom features supplied with non-custom featureset",
@@ -2130,12 +2129,23 @@ func TestValidateInstallConfig(t *testing.T) {
 				c := validInstallConfig()
 				c.FeatureSet = configv1.TechPreviewNoUpgrade
 				c.FeatureGates = []string{
-					"CustomFeature1=True",
-					"CustomFeature2=False",
+					"OpenShiftPodSecurityAdmission=True",
 				}
 				return c
 			}(),
 			expectedError: "featureGates: Forbidden: featureGates can only be used with the CustomNoUpgrade feature set",
+		},
+		{
+			name: "unsupported custom feature name",
+			installConfig: func() *types.InstallConfig {
+				c := validInstallConfig()
+				c.FeatureSet = configv1.CustomNoUpgrade
+				c.FeatureGates = []string{
+					"CustomFeature=True",
+				}
+				return c
+			}(),
+			expectedError: `featureSet: Invalid value: \"CustomNoUpgrade\": failed to parse custom features: \[unsupported \"CustomFeature=True\" featureGate configured\]`,
 		},
 	}
 	for _, tc := range cases {
