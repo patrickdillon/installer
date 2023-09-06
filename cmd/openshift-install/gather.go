@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -19,13 +18,9 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	configclient "github.com/openshift/client-go/config/clientset/versioned"
-	"github.com/openshift/installer/pkg/asset/installconfig"
-	assetstore "github.com/openshift/installer/pkg/asset/store"
-	"github.com/openshift/installer/pkg/asset/tls"
 	serialgather "github.com/openshift/installer/pkg/gather"
 	"github.com/openshift/installer/pkg/gather/service"
 	"github.com/openshift/installer/pkg/gather/ssh"
-	platformstages "github.com/openshift/installer/pkg/terraform/stages/platform"
 
 	_ "github.com/openshift/installer/pkg/gather/aws"
 	_ "github.com/openshift/installer/pkg/gather/azure"
@@ -86,60 +81,7 @@ func newGatherBootstrapCmd() *cobra.Command {
 }
 
 func runGatherBootstrapCmd(directory string) (string, error) {
-	assetStore, err := assetstore.NewStore(directory)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to create asset store")
-	}
-	// add the default bootstrap key pair to the sshKeys list
-	bootstrapSSHKeyPair := &tls.BootstrapSSHKeyPair{}
-	if err := assetStore.Fetch(bootstrapSSHKeyPair); err != nil {
-		return "", errors.Wrapf(err, "failed to fetch %s", bootstrapSSHKeyPair.Name())
-	}
-	tmpfile, err := os.CreateTemp("", "bootstrap-ssh")
-	if err != nil {
-		return "", err
-	}
-	defer os.Remove(tmpfile.Name())
-	if _, err := tmpfile.Write(bootstrapSSHKeyPair.Private()); err != nil {
-		return "", err
-	}
-	if err := tmpfile.Close(); err != nil {
-		return "", err
-	}
-	gatherBootstrapOpts.sshKeys = append(gatherBootstrapOpts.sshKeys, tmpfile.Name())
-
-	bootstrap := gatherBootstrapOpts.bootstrap
-	port := 22
-	masters := gatherBootstrapOpts.masters
-	if bootstrap == "" && len(masters) == 0 {
-		config := &installconfig.InstallConfig{}
-		if err := assetStore.Fetch(config); err != nil {
-			return "", errors.Wrapf(err, "failed to fetch %s", config.Name())
-		}
-
-		for _, stage := range platformstages.StagesForPlatform(config.Config.Platform.Name()) {
-			stageBootstrap, stagePort, stageMasters, err := stage.ExtractHostAddresses(directory, config.Config)
-			if err != nil {
-				logrus.Warnf("Failed to extract host addresses: %s", err.Error())
-			} else {
-				if stageBootstrap != "" {
-					bootstrap = stageBootstrap
-				}
-				if stagePort != 0 {
-					port = stagePort
-				}
-				if len(stageMasters) > 0 {
-					masters = stageMasters
-				}
-			}
-		}
-	}
-
-	if bootstrap == "" {
-		return "", errors.New("must provide bootstrap host address")
-	}
-
-	return gatherBootstrap(bootstrap, port, masters, directory)
+	return "", errors.New("gather bootstrap is not supported")
 }
 
 func gatherBootstrap(bootstrap string, port int, masters []string, directory string) (string, error) {
