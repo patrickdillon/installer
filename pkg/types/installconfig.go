@@ -213,6 +213,14 @@ type InstallConfig struct {
 	// E.g. "featureGates": ["FeatureGate1=true", "FeatureGate2=false"].
 	// +optional
 	FeatureGates []string `json:"featureGates,omitempty"`
+
+	// ManagementCluster is the master url for a management
+	// cluster to use to install the cluster.
+	ManagementClusterURL string `json:"mgmtClusterURL,omitempty"`
+
+	// ManagementClusterKubeconfig is the path to the kubeconfig
+	// for the management cluster.
+	ManagementClusterKubeconfig string `json:"mgmtClusterKubeconfig,omitempty"`
 }
 
 // ClusterDomain returns the DNS domain that all records for a cluster must belong to.

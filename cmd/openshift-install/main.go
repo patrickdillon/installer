@@ -54,6 +54,7 @@ func installerMain() {
 		newMigrateCmd(),
 		newExplainCmd(),
 		newAgentCmd(),
+		newCAPIClusterCmd(),
 	} {
 		rootCmd.AddCommand(subCmd)
 	}

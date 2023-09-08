@@ -2,6 +2,7 @@ package targets
 
 import (
 	"github.com/openshift/installer/pkg/asset"
+	"github.com/openshift/installer/pkg/asset/capi/management"
 	"github.com/openshift/installer/pkg/asset/cluster"
 	"github.com/openshift/installer/pkg/asset/ignition/bootstrap"
 	"github.com/openshift/installer/pkg/asset/ignition/machine"
@@ -71,5 +72,16 @@ var (
 		&password.KubeadminPassword{},
 		&tls.JournalCertKey{},
 		&cluster.Cluster{},
+	}
+
+	CAPICluster = []asset.WritableAsset{
+		&cluster.Metadata{},
+		&machine.MasterIgnitionCustomizations{},
+		&machine.WorkerIgnitionCustomizations{},
+		&cluster.TerraformVariables{},
+		&kubeconfig.AdminClient{},
+		&password.KubeadminPassword{},
+		&tls.JournalCertKey{},
+		&management.Cluster{},
 	}
 )
