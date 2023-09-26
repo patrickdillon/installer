@@ -18,6 +18,8 @@ import (
 	"github.com/openshift/installer/pkg/asset/installconfig"
 	"github.com/openshift/installer/pkg/asset/password"
 	"github.com/openshift/installer/pkg/asset/quota"
+	capiaws "github.com/openshift/installer/pkg/capi/aws"
+	"github.com/openshift/installer/pkg/capi/controlplane"
 	"github.com/openshift/installer/pkg/metrics/timer"
 	"github.com/openshift/installer/pkg/terraform"
 	platformstages "github.com/openshift/installer/pkg/terraform/stages/platform"
@@ -92,6 +94,21 @@ func (c *Cluster) Generate(parents asset.Parents) (err error) {
 		platform = typesazure.StackTerraformName
 	}
 
+	cfg, err := controlplane.Start(InstallDir)
+	if err != nil {
+		return err
+	}
+	err = capiaws.Run(cfg)
+	if err != nil {
+		//return err
+	}
+
+	err = controlplane.Stop()
+	if err != nil {
+		return err
+	}
+
+	panic("done testing")
 	stages := platformstages.StagesForPlatform(platform)
 
 	terraformDir := filepath.Join(InstallDir, "terraform")
