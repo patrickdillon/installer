@@ -28,6 +28,7 @@ import (
 	routeclient "github.com/openshift/client-go/route/clientset/versioned"
 	"github.com/openshift/installer/pkg/asset"
 	"github.com/openshift/installer/pkg/asset/agent/agentconfig"
+	"github.com/openshift/installer/pkg/asset/capi"
 	"github.com/openshift/installer/pkg/asset/cluster"
 	"github.com/openshift/installer/pkg/asset/installconfig"
 	"github.com/openshift/installer/pkg/asset/logging"
@@ -357,6 +358,7 @@ func runTargetCmd(targets ...asset.WritableAsset) func(cmd *cobra.Command, args 
 		defer cleanup()
 
 		cluster.InstallDir = rootOpts.dir
+		capi.InstallDir = rootOpts.dir
 
 		err := runner(rootOpts.dir)
 		if err != nil {
