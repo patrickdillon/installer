@@ -1,0 +1,1 @@
+## providers is a synchronized subtree between openshift/installer & openshift/terraform-providers
