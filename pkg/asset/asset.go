@@ -8,6 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -42,12 +43,27 @@ type WritableAsset interface {
 	Load(FileFetcher) (found bool, err error)
 }
 
+type WritableRuntimeAsset interface {
+	WritableAsset
+
+	// ManifestFiles returns the manifest files along with their
+	// instantiated runtime object.
+	ManifestFiles() []*ManifestFile
+}
+
 // File is a file for an Asset.
 type File struct {
 	// Filename is the name of the file.
 	Filename string
 	// Data is the contents of the file.
 	Data []byte
+}
+
+// ManifestFile is a file that contains a runtime manifest.
+type ManifestFile struct {
+	File
+
+	Object client.Object `json:"-"`
 }
 
 // PersistToFile writes all of the files of the specified asset into the specified
@@ -105,5 +121,10 @@ func isDirEmpty(name string) (bool, error) {
 
 // SortFiles sorts the specified files by file name.
 func SortFiles(files []*File) {
+	sort.Slice(files, func(i, j int) bool { return files[i].Filename < files[j].Filename })
+}
+
+// SortFiles sorts the specified files by file name.
+func SortManifestFiles(files []*ManifestFile) {
 	sort.Slice(files, func(i, j int) bool { return files[i].Filename < files[j].Filename })
 }
