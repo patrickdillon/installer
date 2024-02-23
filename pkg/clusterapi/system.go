@@ -79,6 +79,15 @@ func (c *system) Run(ctx context.Context, installConfig *installconfig.InstallCo
 	ctx, cancel := context.WithCancel(ctx)
 	c.cancel = cancel
 
+	//TODO(padillon): should we add a context.WithTimeout here?
+	// Could that be a safeguard for leaked processes?
+	// Or are we already covered?
+	go func() {
+		<-ctx.Done()
+		cancel()
+		System().Teardown()
+	}()
+
 	// Create the local control plane.
 	lcp := &localControlPlane{}
 	if err := lcp.Run(ctx); err != nil {
