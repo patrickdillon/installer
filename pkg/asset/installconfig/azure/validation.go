@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -628,12 +629,19 @@ func ValidateForProvisioning(client API, ic *types.InstallConfig) error {
 	allErrs = append(allErrs, validateResourceGroup(client, field.NewPath("platform").Child("azure"), ic.Azure)...)
 	allErrs = append(allErrs, ValidateDiskEncryptionSet(client, ic)...)
 	allErrs = append(allErrs, ValidateSecurityProfileDiskEncryptionSet(client, ic)...)
+	allErrs = append(allErrs, validateSkipImageUpload(field.NewPath("image"), ic.ControlPlane.Platform)...)
 	if ic.Azure.CloudName == aztypes.StackCloud {
 		allErrs = append(allErrs, checkAzureStackClusterOSImageSet(ic.Azure.ClusterOSImage, field.NewPath("platform").Child("azure"))...)
 	}
 	return allErrs.ToAggregate()
 }
 
+func validateSkipImageUpload(fieldPath *field.Path, platform types.MachinePoolPlatform) field.ErrorList {
+	if _, ok := os.LookupEnv("OPENSHIFT_INSTALL_SKIP_IMAGE_UPLOAD"); ok && platform.Azure != nil && len(platform.Azure.OSImage.SKU) > 0 {
+		return nil
+	}
+	return field.ErrorList{field.Invalid(field.NewPath("image"), "image", "cannot skip image upload without marketplace image specified")}
+}
 func validateResourceGroup(client API, fieldPath *field.Path, platform *aztypes.Platform) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(platform.ResourceGroupName) == 0 {
