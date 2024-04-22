@@ -97,7 +97,7 @@ func (ps *State) Init(name string) error {
 	}
 
 	if ps.StopTimeout == 0 {
-		ps.StopTimeout = 20 * time.Second
+		ps.StopTimeout = 40 * time.Second
 	}
 	return nil
 }
