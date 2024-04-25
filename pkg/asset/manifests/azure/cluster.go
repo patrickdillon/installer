@@ -3,6 +3,7 @@ package azure
 import (
 	"fmt"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -82,6 +83,9 @@ func GenerateClusterAssets(installConfig *installconfig.InstallConfig, clusterID
 					LoadBalancerClassSpec: capz.LoadBalancerClassSpec{
 						Type: capz.Internal,
 					},
+				},
+				ControlPlaneOutboundLB: &capz.LoadBalancerSpec{
+					FrontendIPsCount: to.Ptr(int32(1)),
 				},
 				Subnets: capz.Subnets{
 					{
