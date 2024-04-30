@@ -1,5 +1,5 @@
 resource "azurestack_network_security_group" "cluster" {
-  name                = "${var.cluster_id}-nsg"
+  name                = "${var.cluster_id}-controlplane-nsg"
   location            = var.azure_region
   resource_group_name = data.azurestack_resource_group.main.name
 }
