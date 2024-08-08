@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/utils/ptr"
 
+	"github.com/openshift/installer/pkg/infrastructure/clusterapi"
 	infracapi "github.com/openshift/installer/pkg/infrastructure/clusterapi"
 	nutanixtypes "github.com/openshift/installer/pkg/types/nutanix"
 )
@@ -26,9 +27,9 @@ func (p Provider) Name() string {
 	return nutanixtypes.Name
 }
 
-// BootstrapHasPublicIP indicates that an ExternalIP is not
-// required in the machine ready checks.
-func (Provider) BootstrapHasPublicIP() bool { return false }
+// PublicGatherEndpoint() indicates that machine ready checks should NOT wait for an ExternalIP
+// in the status when declaring machines ready.
+func (Provider) PublicGatherEndpoint() clusterapi.GatherEndpoint { return clusterapi.InternalIP }
 
 // PreProvision creates the resources required prior to running capi nutanix controller.
 func (p Provider) PreProvision(ctx context.Context, in infracapi.PreProvisionInput) error {
