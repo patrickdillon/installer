@@ -368,6 +368,8 @@ func (i *InfraProvider) Provision(ctx context.Context, dir string, parents asset
 			return fileList, fmt.Errorf("%s: machines are not ready: %w", asset.ControlPlaneCreationError, err)
 		}
 	}
+	// Testing! DNM. Introduce a false cp provisioning failure to test gather
+	return fileList, fmt.Errorf("%s: machines are not ready: TEST FAILURE", asset.ControlPlaneCreationError)
 	timer.StopTimer(machineStage)
 	logrus.Info("Control-plane machines are ready")
 
