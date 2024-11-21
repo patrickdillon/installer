@@ -1,6 +1,6 @@
-package main
+package data
 
 import "embed"
 
 //go:embed bootstrap/* manifests/*
-var InstallerData embed.FS
+var _ embed.FS
