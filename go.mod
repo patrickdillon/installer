@@ -42,6 +42,7 @@ require (
 	github.com/coreos/ignition/v2 v2.20.0
 	github.com/coreos/stream-metadata-go v0.1.8
 	github.com/daixiang0/gci v0.13.4
+	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/digitalocean/go-libvirt v0.0.0-20240220204746-fcabe97a6eed
 	github.com/diskfs/go-diskfs v1.4.0
 	github.com/form3tech-oss/jwt-go v3.2.3+incompatible
@@ -169,7 +170,6 @@ require (
 	github.com/coreos/go-semver v0.3.1 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/coreos/vcontext v0.0.0-20230201181013-d72178a18687 // indirect
-	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/elliotwutingfeng/asciiset v0.0.0-20230602022725-51bbb787efab // indirect
 	github.com/emicklei/go-restful/v3 v3.12.1 // indirect
@@ -327,3 +327,5 @@ replace github.com/openshift/assisted-service/models => github.com/openshift/ass
 replace github.com/containerd/containerd => github.com/containerd/containerd v1.6.26
 
 replace github.com/vmware-tanzu/vm-operator/pkg/constants/testlabels => github.com/vmware-tanzu/vm-operator/pkg/constants/testlabels v0.0.0-20240404200847-de75746a9505
+
+replace github.com/coreos/stream-metadata-go => github.com/patrickdillon/stream-metadata-go v0.0.0-20241218015503-c2c025dea87f
