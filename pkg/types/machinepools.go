@@ -128,6 +128,14 @@ type MachinePool struct {
 	// The available types are etcd, swap and user-defined.
 	// +optional
 	DiskSetup []Disk `json:"diskSetup,omitempty"`
+
+	// Management is the API that will be used for machine management in the cluster.
+	// Default is ClusterAPI.
+	//
+	// +kubebuilder:default=ClusterAPI
+	// +kubebuilder:validation:Enum=ClusterAPI;MachineAPI
+	// +optional
+	Management MachineManagementAPI `json:"management,omitempty"`
 }
 
 // MachinePoolPlatform is the platform-specific configuration for a machine
@@ -229,3 +237,13 @@ type Credential struct {
 	// +optional
 	CertificateVerification CertificateVerificationPolicy `json:"certificateVerification,omitempty"`
 }
+
+// MachineManagementAPI is the API used for machine management in the cluster.
+type MachineManagementAPI string
+
+const (
+	// ClusterAPI indicates that the machine management API is ClusterAPI.
+	ClusterAPI MachineManagementAPI = "ClusterAPI"
+	// MachineAPI indicates that the machine management API is MachineAPI.
+	MachineAPI MachineManagementAPI = "MachineAPI"
+)
