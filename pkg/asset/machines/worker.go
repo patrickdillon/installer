@@ -535,21 +535,51 @@ func (w *Worker) Generate(ctx context.Context, dependencies asset.Parents) error
 			}
 
 			pool.Platform.AWS = &mpool
-			sets, err := aws.MachineSets(&aws.MachineSetInput{
-				ClusterID:                clusterID.InfraID,
-				InstallConfigPlatformAWS: installConfig.Config.Platform.AWS,
-				Subnets:                  subnets,
-				Zones:                    zones,
-				PublicSubnet:             awstypes.IsPublicOnlySubnetsEnabled(),
-				Pool:                     &pool,
-				Role:                     pool.Name,
-				UserDataSecret:           workerUserDataSecretName,
-			})
-			if err != nil {
-				return errors.Wrap(err, "failed to create worker machine objects")
-			}
-			for _, set := range sets {
-				machineSets = append(machineSets, set)
+
+			// Check if CAPI compute management is enabled
+			useClusterAPI := installConfig.Config.EnabledFeatureGates().Enabled(features.FeatureGateClusterAPIComputeInstall) &&
+				pool.Management == types.ClusterAPI
+
+			if useClusterAPI {
+				// Generate CAPI AWSMachineTemplate + MachineSet
+				output, err := aws.ClusterAPIMachineSets(&aws.ClusterAPIMachineSetInput{
+					ClusterID:                clusterID.InfraID,
+					InstallConfigPlatformAWS: installConfig.Config.Platform.AWS,
+					Subnets:                  subnets,
+					Zones:                    zones,
+					PublicSubnet:             awstypes.IsPublicOnlySubnetsEnabled(),
+					Pool:                     &pool,
+					Role:                     pool.Name,
+					UserDataSecret:           workerUserDataSecretName,
+				})
+				if err != nil {
+					return errors.Wrap(err, "failed to create CAPI worker machineset objects")
+				}
+
+				// Marshal AWSMachineTemplates and MachineSets to machineSets slice
+				for i := range output.MachineTemplates {
+					machineSets = append(machineSets, &output.MachineTemplates[i])
+				}
+				for i := range output.MachineSets {
+					machineSets = append(machineSets, &output.MachineSets[i])
+				}
+			} else {
+				sets, err := aws.MachineSets(&aws.MachineSetInput{
+					ClusterID:                clusterID.InfraID,
+					InstallConfigPlatformAWS: installConfig.Config.Platform.AWS,
+					Subnets:                  subnets,
+					Zones:                    zones,
+					PublicSubnet:             awstypes.IsPublicOnlySubnetsEnabled(),
+					Pool:                     &pool,
+					Role:                     pool.Name,
+					UserDataSecret:           workerUserDataSecretName,
+				})
+				if err != nil {
+					return errors.Wrap(err, "failed to create worker machine objects")
+				}
+				for _, set := range sets {
+					machineSets = append(machineSets, set)
+				}
 			}
 		case azuretypes.Name:
 			mpool := defaultAzureMachinePoolPlatform(installConfig.Config.Platform.Azure.CloudName)
