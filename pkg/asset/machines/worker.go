@@ -285,12 +285,13 @@ func awsSetPreferredInstanceByEdgeZone(ctx context.Context, defaultTypes []strin
 
 // Worker generates the machinesets for `worker` machine pool.
 type Worker struct {
-	UserDataFile       *asset.File
-	MachineConfigFiles []*asset.File
-	MachineSetFiles    []*asset.File
-	MachineFiles       []*asset.File
-	IPClaimFiles       []*asset.File
-	IPAddrFiles        []*asset.File
+	UserDataFile         *asset.File
+	MachineConfigFiles   []*asset.File
+	MachineSetFiles      []*asset.File
+	MachineTemplateFiles []*asset.File
+	MachineFiles         []*asset.File
+	IPClaimFiles         []*asset.File
+	IPAddrFiles          []*asset.File
 }
 
 // Name returns a human friendly name for the Worker Asset.
@@ -330,6 +331,7 @@ func (w *Worker) Generate(ctx context.Context, dependencies asset.Parents) error
 	machines := []machinev1beta1.Machine{}
 	machineConfigs := []*mcfgv1.MachineConfig{}
 	machineSets := []runtime.Object{}
+	machineTemplates := []runtime.Object{}
 	var ipClaims []ipamv1.IPAddressClaim
 	var ipAddrs []ipamv1.IPAddress
 	var err error
@@ -544,7 +546,8 @@ func (w *Worker) Generate(ctx context.Context, dependencies asset.Parents) error
 			}
 
 			pool.Platform.AWS = &mpool
-			sets, err := aws.MachineSets(&aws.MachineSetInput{
+
+			input := &aws.MachineSetInput{
 				ClusterID:                clusterID.InfraID,
 				InstallConfigPlatformAWS: installConfig.Config.Platform.AWS,
 				Subnets:                  subnets,
@@ -554,13 +557,27 @@ func (w *Worker) Generate(ctx context.Context, dependencies asset.Parents) error
 				Role:                     pool.Name,
 				UserDataSecret:           workerUserDataSecretName,
 				Hosts:                    dHosts,
-				Config:                   installConfig.Config,
-			})
-			if err != nil {
-				return errors.Wrap(err, "failed to create worker machine objects")
-			}
-			for _, set := range sets {
-				machineSets = append(machineSets, set)
+			} //TODO probably needs to be updated for rhcos stream labeling
+
+			if pool.Management == types.ClusterAPI {
+				templates, sets, err := aws.ClusterAPIMachineSets(input)
+				if err != nil {
+					return fmt.Errorf("failed to create CAPI worker machineset objects: %w", err)
+				}
+				for _, template := range templates {
+					machineTemplates = append(machineTemplates, &template)
+				}
+				for _, set := range sets {
+					machineSets = append(machineSets, &set)
+				}
+			} else {
+				sets, err := aws.MachineSets(input)
+				if err != nil {
+					return fmt.Errorf("failed to create worker machine objects: %w", err)
+				}
+				for _, set := range sets {
+					machineSets = append(machineSets, set)
+				}
 			}
 		case azuretypes.Name:
 			mpool := defaultAzureMachinePoolPlatform(installConfig.Config.Platform.Azure.CloudName)

@@ -16,6 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
 	ipamv1 "sigs.k8s.io/cluster-api/api/ipam/v1beta1" //nolint:staticcheck //CORS-3563
 	"sigs.k8s.io/yaml"
 
@@ -259,21 +260,63 @@ func (m *Master) Generate(ctx context.Context, dependencies asset.Parents) error
 		}
 
 		pool.Platform.AWS = &mpool
-		machines, controlPlaneMachineSet, err = aws.Machines(
-			clusterID.InfraID,
-			installConfig.Config.Platform.AWS.Region,
-			subnets,
-			&pool,
-			"master",
-			masterUserDataSecretName,
-			installConfig.Config.Platform.AWS.UserTags,
-			awstypes.IsPublicOnlySubnetsEnabled(),
-			installConfig.Config,
-		)
-		if err != nil {
-			return errors.Wrap(err, "failed to create master machine objects")
+
+		// Check if CAPI control plane management is enabled
+		useClusterAPI := installConfig.Config.EnabledFeatureGates().Enabled(features.FeatureGateClusterAPIControlPlaneInstall) &&
+			pool.Management == types.ClusterAPI
+
+		if useClusterAPI {
+			// Generate CAPI AWSMachine + Machine manifests
+			tags, err := aws.CapaTagsFromUserTags(clusterID.InfraID, installConfig.Config.Platform.AWS.UserTags)
+			if err != nil {
+				return fmt.Errorf("failed to create CAPA tags: %w", err)
+			}
+
+			capiMachines, err := aws.GenerateMachines(clusterID.InfraID, &aws.MachineInput{
+				Role:     "master",
+				Pool:     &pool,
+				Subnets:  subnets,
+				Tags:     tags,
+				PublicIP: awstypes.IsPublicOnlySubnetsEnabled(),
+				Ignition: &capa.Ignition{
+					Version:     "3.2",
+					StorageType: capa.IgnitionStorageTypeOptionUnencryptedUserData,
+				},
+			}) //TODO Add RHCOS stream label
+			if err != nil {
+				return errors.Wrap(err, "failed to create CAPI master machine objects")
+			}
+
+			// Marshal CAPI manifests to files
+			// TODO: ControlPlaneMachineSet for CAPI path
+			m.MachineFiles = make([]*asset.File, 0, len(capiMachines))
+			for _, rf := range capiMachines {
+				data, err := yaml.Marshal(rf.Object)
+				if err != nil {
+					return errors.Wrapf(err, "marshal CAPI machine %s", rf.Filename)
+				}
+				m.MachineFiles = append(m.MachineFiles, &asset.File{
+					Filename: filepath.Join(directory, rf.Filename),
+					Data:     data,
+				})
+			}
+		} else {
+			machines, controlPlaneMachineSet, err = aws.Machines(
+				clusterID.InfraID,
+				installConfig.Config.Platform.AWS.Region,
+				subnets,
+				&pool,
+				"master",
+				masterUserDataSecretName,
+				installConfig.Config.Platform.AWS.UserTags,
+				awstypes.IsPublicOnlySubnetsEnabled(),
+				installConfig.Config,
+			)
+			if err != nil {
+				return errors.Wrap(err, "failed to create master machine objects")
+			}
+			aws.ConfigMasters(machines, controlPlaneMachineSet, clusterID.InfraID, ic.Publish)
 		}
-		aws.ConfigMasters(machines, controlPlaneMachineSet, clusterID.InfraID, ic.Publish)
 	case gcptypes.Name:
 		mpool := defaultGCPMachinePoolPlatform(pool.Architecture)
 		mpool.Set(ic.Platform.GCP.DefaultMachinePlatform)

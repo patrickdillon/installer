@@ -39,6 +39,69 @@ type MachineInput struct {
 	Config         *types.InstallConfig
 }
 
+// AWSMachineSpecInput defines inputs for building an AWSMachineSpec.
+type AWSMachineSpecInput struct {
+	InstanceType               string
+	AMI                        string
+	IAMInstanceProfile         string
+	Subnet                     *capa.AWSResourceReference
+	PublicIP                   bool
+	Tags                       capa.Tags
+	EC2RootVolume              awstypes.EC2RootVolume
+	KMSKeyARN                  string
+	IMDS                       capa.HTTPTokensState
+	AdditionalSecurityGroupIDs []string
+	CPUOptions                 *awstypes.CPUOptions
+	Ignition                   *capa.Ignition
+}
+
+// GenerateAWSMachineSpec constructs a capa.GenerateAWSMachineSpec from the provided inputs.
+func GenerateAWSMachineSpec(in *AWSMachineSpecInput) capa.AWSMachineSpec {
+	spec := capa.AWSMachineSpec{
+		Ignition:             in.Ignition,
+		UncompressedUserData: ptr.To(true),
+		InstanceType:         in.InstanceType,
+		AMI:                  capa.AMIReference{ID: ptr.To(in.AMI)},
+		SSHKeyName:           ptr.To(""),
+		IAMInstanceProfile:   in.IAMInstanceProfile,
+		Subnet:               in.Subnet,
+		PublicIP:             ptr.To(in.PublicIP),
+		AdditionalTags:       in.Tags,
+		RootVolume: &capa.Volume{
+			Size:          int64(in.EC2RootVolume.Size),
+			Type:          capa.VolumeType(in.EC2RootVolume.Type),
+			IOPS:          int64(in.EC2RootVolume.IOPS),
+			Encrypted:     ptr.To(true),
+			EncryptionKey: in.KMSKeyARN,
+		},
+		InstanceMetadataOptions: &capa.InstanceMetadataOptions{
+			HTTPTokens:   in.IMDS,
+			HTTPEndpoint: capa.InstanceMetadataEndpointStateEnabled,
+		},
+	}
+
+	if throughput := in.EC2RootVolume.Throughput; throughput != nil {
+		spec.RootVolume.Throughput = ptr.To(int64(*throughput))
+	}
+
+	for _, sg := range in.AdditionalSecurityGroupIDs {
+		spec.AdditionalSecurityGroups = append(
+			spec.AdditionalSecurityGroups,
+			capa.AWSResourceReference{ID: ptr.To(sg)},
+		)
+	}
+
+	if in.CPUOptions != nil {
+		cpuOptions := capa.CPUOptions{}
+		if in.CPUOptions.ConfidentialCompute != nil {
+			cpuOptions.ConfidentialCompute = capa.AWSConfidentialComputePolicy(*in.CPUOptions.ConfidentialCompute)
+		}
+		spec.CPUOptions = cpuOptions
+	}
+
+	return spec
+}
+
 // GenerateMachines returns manifests and runtime objects to provision the control plane (including bootstrap, if applicable) nodes using CAPI.
 func GenerateMachines(clusterID string, in *MachineInput) ([]*asset.RuntimeFile, error) {
 	if poolPlatform := in.Pool.Platform.Name(); poolPlatform != awstypes.Name {
@@ -97,28 +160,20 @@ func GenerateMachines(clusterID string, in *MachineInput) ([]*asset.RuntimeFile,
 					"cluster.x-k8s.io/control-plane": "",
 				},
 			},
-			Spec: capa.AWSMachineSpec{
-				Ignition:             in.Ignition,
-				UncompressedUserData: ptr.To(true),
-				InstanceType:         mpool.InstanceType,
-				AMI:                  capa.AMIReference{ID: ptr.To(mpool.AMIID)},
-				SSHKeyName:           ptr.To(""),
-				IAMInstanceProfile:   instanceProfile,
-				Subnet:               subnet,
-				PublicIP:             ptr.To(in.PublicIP),
-				AdditionalTags:       in.Tags,
-				RootVolume: &capa.Volume{
-					Size:          int64(mpool.EC2RootVolume.Size),
-					Type:          capa.VolumeType(mpool.EC2RootVolume.Type),
-					IOPS:          int64(mpool.EC2RootVolume.IOPS),
-					Encrypted:     ptr.To(true),
-					EncryptionKey: mpool.KMSKeyARN,
-				},
-				InstanceMetadataOptions: &capa.InstanceMetadataOptions{
-					HTTPTokens:   imds,
-					HTTPEndpoint: capa.InstanceMetadataEndpointStateEnabled,
-				},
-			},
+			Spec: GenerateAWSMachineSpec(&AWSMachineSpecInput{
+				InstanceType:               mpool.InstanceType,
+				AMI:                        mpool.AMIID,
+				IAMInstanceProfile:         instanceProfile,
+				Subnet:                     subnet,
+				PublicIP:                   in.PublicIP,
+				Tags:                       in.Tags,
+				EC2RootVolume:              mpool.EC2RootVolume,
+				KMSKeyARN:                  mpool.KMSKeyARN,
+				IMDS:                       imds,
+				AdditionalSecurityGroupIDs: mpool.AdditionalSecurityGroupIDs,
+				CPUOptions:                 mpool.CPUOptions,
+				Ignition:                   in.Ignition,
+			}),
 		}
 		awsMachine.SetGroupVersionKind(capa.GroupVersion.WithKind("AWSMachine"))
 		utils.SetMachineOSStreamLabels(awsMachine, in.Config)
@@ -157,24 +212,6 @@ func GenerateMachines(clusterID string, in *MachineInput) ([]*asset.RuntimeFile,
 					PublicIpv4PoolFallBackOrder: ptr.To(capa.PublicIpv4PoolFallbackOrderAmazonPool),
 				}
 			}
-		}
-
-		// Handle additional security groups.
-		for _, sg := range mpool.AdditionalSecurityGroupIDs {
-			awsMachine.Spec.AdditionalSecurityGroups = append(
-				awsMachine.Spec.AdditionalSecurityGroups,
-				capa.AWSResourceReference{ID: ptr.To(sg)},
-			)
-		}
-
-		if mpool.CPUOptions != nil {
-			cpuOptions := capa.CPUOptions{}
-
-			if mpool.CPUOptions.ConfidentialCompute != nil {
-				cpuOptions.ConfidentialCompute = capa.AWSConfidentialComputePolicy(*mpool.CPUOptions.ConfidentialCompute)
-			}
-
-			awsMachine.Spec.CPUOptions = cpuOptions
 		}
 
 		result = append(result, &asset.RuntimeFile{
