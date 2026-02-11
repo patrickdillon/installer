@@ -130,6 +130,7 @@ type MachinePool struct {
 	DiskSetup []Disk `json:"diskSetup,omitempty"`
 
 	// Management is the API that will be used for machine management in the cluster.
+	// This field is Tech Preview & requires the TechPreviewNoUpgrade feature set to be enabled.
 	// Default is ClusterAPI.
 	//
 	// +kubebuilder:default=ClusterAPI
