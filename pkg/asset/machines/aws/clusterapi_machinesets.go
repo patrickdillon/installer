@@ -123,54 +123,23 @@ func ClusterAPIMachineSets(in *ClusterAPIMachineSetInput) (*ClusterAPIMachineSet
 		name := fmt.Sprintf("%s-%s-%s", in.ClusterID, in.Pool.Name, az)
 
 		// Build AWSMachineTemplate for this zone
-		templateSpec := capa.AWSMachineSpec{
-			InstanceType:       instanceType,
-			AMI:                capa.AMIReference{ID: ptr.To(mpool.AMIID)},
-			SSHKeyName:         ptr.To(""),
-			IAMInstanceProfile: instanceProfile,
-			Subnet:             subnetRef,
-			PublicIP:           ptr.To(publicSubnet),
-			AdditionalTags:     tags,
-			RootVolume: &capa.Volume{
-				Size:      int64(mpool.EC2RootVolume.Size),
-				Type:      capa.VolumeType(mpool.EC2RootVolume.Type),
-				IOPS:      int64(mpool.EC2RootVolume.IOPS),
-				Encrypted: ptr.To(true),
-			},
-			InstanceMetadataOptions: &capa.InstanceMetadataOptions{
-				HTTPTokens:   imds,
-				HTTPEndpoint: capa.InstanceMetadataEndpointStateEnabled,
-			},
-			UncompressedUserData: ptr.To(true),
+		templateSpec := GenerateAWSMachineSpec(&AWSMachineSpecInput{
+			InstanceType:               instanceType,
+			AMI:                        mpool.AMIID,
+			IAMInstanceProfile:         instanceProfile,
+			Subnet:                     subnetRef,
+			PublicIP:                   publicSubnet,
+			Tags:                       tags,
+			EC2RootVolume:              mpool.EC2RootVolume,
+			KMSKeyARN:                  mpool.KMSKeyARN,
+			IMDS:                       imds,
+			AdditionalSecurityGroupIDs: mpool.AdditionalSecurityGroupIDs,
+			CPUOptions:                 mpool.CPUOptions,
 			Ignition: &capa.Ignition{
 				Version:     "3.2",
 				StorageType: capa.IgnitionStorageTypeOptionUnencryptedUserData,
 			},
-		}
-
-		if throughput := mpool.EC2RootVolume.Throughput; throughput != nil {
-			templateSpec.RootVolume.Throughput = ptr.To(int64(*throughput))
-		}
-
-		if mpool.KMSKeyARN != "" {
-			templateSpec.RootVolume.EncryptionKey = mpool.KMSKeyARN
-		}
-
-		// Handle additional security groups.
-		for _, sg := range mpool.AdditionalSecurityGroupIDs {
-			templateSpec.AdditionalSecurityGroups = append(
-				templateSpec.AdditionalSecurityGroups,
-				capa.AWSResourceReference{ID: ptr.To(sg)},
-			)
-		}
-
-		if mpool.CPUOptions != nil {
-			cpuOptions := capa.CPUOptions{}
-			if mpool.CPUOptions.ConfidentialCompute != nil {
-				cpuOptions.ConfidentialCompute = capa.AWSConfidentialComputePolicy(*mpool.CPUOptions.ConfidentialCompute)
-			}
-			templateSpec.CPUOptions = cpuOptions
-		}
+		})
 
 		template := capa.AWSMachineTemplate{
 			TypeMeta: metav1.TypeMeta{
