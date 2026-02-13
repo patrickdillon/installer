@@ -4,41 +4,21 @@ package aws
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	capa "sigs.k8s.io/cluster-api-provider-aws/v2/api/v1beta2"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta1" //nolint:staticcheck //CORS-3563
 
-	icaws "github.com/openshift/installer/pkg/asset/installconfig/aws"
 	"github.com/openshift/installer/pkg/types"
 	"github.com/openshift/installer/pkg/types/aws"
 )
 
-// ClusterAPIMachineSetInput defines inputs for generating CAPI MachineSets.
-type ClusterAPIMachineSetInput struct {
-	ClusterID                string
-	InstallConfigPlatformAWS *aws.Platform
-	Subnets                  icaws.SubnetsByZone
-	Zones                    icaws.Zones
-	PublicSubnet             bool
-	Pool                     *types.MachinePool
-	Role                     string
-	UserDataSecret           string
-}
-
-// ClusterAPIMachineSetOutput contains the generated CAPI resources.
-type ClusterAPIMachineSetOutput struct {
-	MachineTemplates []capa.AWSMachineTemplate
-	MachineSets      []capi.MachineSet
-}
-
 // ClusterAPIMachineSets returns CAPI MachineSet and AWSMachineTemplate resources.
 // This mirrors the MAPI MachineSets() function but produces CAPI-native types.
-func ClusterAPIMachineSets(in *ClusterAPIMachineSetInput) (*ClusterAPIMachineSetOutput, error) {
+func ClusterAPIMachineSets(in *MachineSetInput) ([]capa.AWSMachineTemplate, []capi.MachineSet, error) {
 	if poolPlatform := in.Pool.Platform.Name(); poolPlatform != aws.Name {
-		return nil, fmt.Errorf("non-AWS machine-pool: %q", poolPlatform)
+		return nil, nil, fmt.Errorf("non-AWS machine-pool: %q", poolPlatform)
 	}
 	mpool := in.Pool.Platform.AWS
 	azs := mpool.Zones
@@ -64,7 +44,7 @@ func ClusterAPIMachineSets(in *ClusterAPIMachineSetInput) (*ClusterAPIMachineSet
 
 	tags, err := CapaTagsFromUserTags(in.ClusterID, in.InstallConfigPlatformAWS.UserTags)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create CAPA tags from user tags")
+		return nil, nil, fmt.Errorf("failed to create CAPA tags from user tags: %w", err)
 	}
 
 	for idx, az := range mpool.Zones {
@@ -82,7 +62,7 @@ func ClusterAPIMachineSets(in *ClusterAPIMachineSetInput) (*ClusterAPIMachineSet
 		if len(in.Subnets) > 0 {
 			subnet, ok := in.Subnets[az]
 			if !ok {
-				return nil, errors.Errorf("no subnet for zone %s", az)
+				return nil, nil, fmt.Errorf("no subnet for zone %s", az)
 			}
 			publicSubnet = subnet.Public
 			subnetRef.ID = ptr.To(subnet.ID)
@@ -230,9 +210,5 @@ func ClusterAPIMachineSets(in *ClusterAPIMachineSetInput) (*ClusterAPIMachineSet
 
 		machineSets = append(machineSets, machineSet)
 	}
-
-	return &ClusterAPIMachineSetOutput{
-		MachineTemplates: templates,
-		MachineSets:      machineSets,
-	}, nil
+	return templates, machineSets, nil
 }
