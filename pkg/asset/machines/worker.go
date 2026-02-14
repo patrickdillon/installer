@@ -13,8 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
-	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1"
-	ipamv1 "sigs.k8s.io/cluster-api/api/ipam/v1beta1" //nolint:staticcheck //CORS-3563
+	capz "sigs.k8s.io/cluster-api-provider-azure/api/v1beta1" //nolint:staticcheck //CORS-3563
 	"sigs.k8s.io/yaml"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -72,6 +71,9 @@ import (
 const (
 	// workerMachineSetFileName is the format string for constructing the worker MachineSet filenames.
 	workerMachineSetFileName = "99_openshift-cluster-api_worker-machineset-%s.yaml"
+
+	// workerMachineTemplateFileName is the format string for constructing the worker MachineTemplate filenames.
+	workerMachineTemplateFileName = "99_openshift-cluster-api_worker-machinetemplate-%s.yaml"
 
 	// workerMachineFileName is the format string for constructing the worker Machine filenames.
 	workerMachineFileName = "99_openshift-cluster-api_worker-machines-%s.yaml"
@@ -328,12 +330,8 @@ func (w *Worker) Generate(ctx context.Context, dependencies asset.Parents) error
 
 	workerUserDataSecretName := "worker-user-data"
 
-	machines := []machinev1beta1.Machine{}
 	machineConfigs := []*mcfgv1.MachineConfig{}
-	machineSets := []runtime.Object{}
-	machineTemplates := []runtime.Object{}
-	var ipClaims []ipamv1.IPAddressClaim
-	var ipAddrs []ipamv1.IPAddress
+	var ipClaims, ipAddrs, machineTemplates, machineSets, machines []runtime.Object
 	var err error
 	ic := installConfig.Config
 	for _, pool := range ic.Compute {
@@ -755,9 +753,15 @@ func (w *Worker) Generate(ctx context.Context, dependencies asset.Parents) error
 					return errors.Wrap(err, "failed to create worker machine objects")
 				}
 
-				machines = data.Machines
-				ipClaims = data.IPClaims
-				ipAddrs = data.IPAddresses
+				for _, m := range data.Machines {
+					machines = append(machines, &m)
+				}
+				for _, c := range data.IPClaims {
+					ipClaims = append(ipClaims, &c)
+				}
+				for _, a := range data.IPAddresses {
+					ipAddrs = append(ipAddrs, &a)
+				}
 
 				logrus.Debugf("Generated %v worker machines.", len(machines))
 
@@ -829,58 +833,20 @@ func (w *Worker) Generate(ctx context.Context, dependencies asset.Parents) error
 		return errors.Wrap(err, "failed to create MachineConfig manifests for worker machines")
 	}
 
-	w.MachineSetFiles = make([]*asset.File, len(machineSets))
-	padFormat := fmt.Sprintf("%%0%dd", len(fmt.Sprintf("%d", len(machineSets))))
-	for i, machineSet := range machineSets {
-		data, err := yaml.Marshal(machineSet)
-		if err != nil {
-			return errors.Wrapf(err, "marshal worker %d", i)
-		}
-
-		padded := fmt.Sprintf(padFormat, i)
-		w.MachineSetFiles[i] = &asset.File{
-			Filename: filepath.Join(directory, fmt.Sprintf(workerMachineSetFileName, padded)),
-			Data:     data,
-		}
+	if w.MachineSetFiles, err = serialize(machineSets, workerMachineSetFileName); err != nil {
+		return fmt.Errorf("failed to serialize worker machine sets: %w", err)
 	}
-
-	w.IPClaimFiles = make([]*asset.File, len(ipClaims))
-	for i, claim := range ipClaims {
-		data, err := yaml.Marshal(claim)
-		if err != nil {
-			return errors.Wrapf(err, "marshal ip claim %v", claim.Name)
-		}
-
-		w.IPClaimFiles[i] = &asset.File{
-			Filename: filepath.Join(directory, fmt.Sprintf(ipClaimFileName, claim.Name)),
-			Data:     data,
-		}
+	if w.MachineTemplateFiles, err = serialize(machineTemplates, workerMachineTemplateFileName); err != nil {
+		return fmt.Errorf("failed to serialize worker machine templates: %w", err)
 	}
-
-	w.IPAddrFiles = make([]*asset.File, len(ipAddrs))
-	for i, address := range ipAddrs {
-		data, err := yaml.Marshal(address)
-		if err != nil {
-			return errors.Wrapf(err, "marshal ip claim %v", address.Name)
-		}
-
-		w.IPAddrFiles[i] = &asset.File{
-			Filename: filepath.Join(directory, fmt.Sprintf(ipAddressFileName, address.Name)),
-			Data:     data,
-		}
+	if w.IPClaimFiles, err = serialize(ipClaims, ipClaimFileName); err != nil {
+		return fmt.Errorf("failed to serialize worker ip claims: %w", err)
 	}
-	w.MachineFiles = make([]*asset.File, len(machines))
-	for i, machineDef := range machines {
-		data, err := yaml.Marshal(machineDef)
-		if err != nil {
-			return errors.Wrapf(err, "marshal master %d", i)
-		}
-
-		padded := fmt.Sprintf(padFormat, i)
-		w.MachineFiles[i] = &asset.File{
-			Filename: filepath.Join(directory, fmt.Sprintf(workerMachineFileName, padded)),
-			Data:     data,
-		}
+	if w.IPAddrFiles, err = serialize(ipAddrs, ipAddressFileName); err != nil {
+		return fmt.Errorf("failed to serialize worker ip addresses: %w", err)
+	}
+	if w.MachineFiles, err = serialize(machines, workerMachineFileName); err != nil {
+		return fmt.Errorf("failed to serialize worker machines: %w", err)
 	}
 	return nil
 }
@@ -893,12 +859,14 @@ func (w *Worker) Files() []*asset.File {
 	}
 	files = append(files, w.MachineConfigFiles...)
 	files = append(files, w.MachineSetFiles...)
+	files = append(files, w.MachineTemplateFiles...)
 	files = append(files, w.MachineFiles...)
 	files = append(files, w.IPClaimFiles...)
 	files = append(files, w.IPAddrFiles...)
 	return files
 }
 
+// TODO handle load
 // Load reads the asset files from disk.
 func (w *Worker) Load(f asset.FileFetcher) (found bool, err error) {
 	file, err := f.FetchByName(filepath.Join(directory, workerUserDataFileName))
@@ -993,4 +961,23 @@ func (w *Worker) MachineSets() ([]machinev1beta1.MachineSet, error) {
 	}
 
 	return machineSets, nil
+}
+
+// TODO check if padding causes issues for ipam or other assets that dont use it.
+func serialize(manifests []runtime.Object, fileName string) ([]*asset.File, error) {
+	files := make([]*asset.File, len(manifests))
+	padFormat := fmt.Sprintf("%%0%dd", len(fmt.Sprintf("%d", len(manifests))))
+	for i, m := range manifests {
+		data, err := yaml.Marshal(m)
+		if err != nil {
+			return nil, fmt.Errorf("marshaling %s: %w", fmt.Sprintf(fileName, i), err)
+		}
+
+		padded := fmt.Sprintf(padFormat, i)
+		files[i] = &asset.File{
+			Filename: filepath.Join(directory, fmt.Sprintf(fileName, padded)),
+			Data:     data,
+		}
+	}
+	return files, nil
 }
