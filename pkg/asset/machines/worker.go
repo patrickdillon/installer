@@ -823,12 +823,21 @@ func (w *Worker) Generate(ctx context.Context, dependencies asset.Parents) error
 		return errors.Wrap(err, "failed to create MachineConfig manifests for worker machines")
 	}
 
-	serialize(machineSets, w.MachineSetFiles, workerMachineFileName)
-	serialize(machineTemplates, w.MachineTemplateFiles, workerMachineTemplateFileName)
-	serialize(ipClaims, w.IPClaimFiles, ipClaimFileName)
-	serialize(ipAddrs, w.IPAddrFiles, ipAddressFileName)
-	serialize(machines, w.MachineFiles, workerMachineFileName)
-
+	if w.MachineSetFiles, err = serialize(machineSets, workerMachineSetFileName); err != nil {
+		return fmt.Errorf("failed to serialize worker machine sets: %w", err)
+	}
+	if w.MachineTemplateFiles, err = serialize(machineTemplates, workerMachineTemplateFileName); err != nil {
+		return fmt.Errorf("failed to serialize worker machine templates: %w", err)
+	}
+	if w.IPClaimFiles, err = serialize(ipClaims, ipClaimFileName); err != nil {
+		return fmt.Errorf("failed to serialize worker ip claims: %w", err)
+	}
+	if w.IPAddrFiles, err = serialize(ipAddrs, ipAddressFileName); err != nil {
+		return fmt.Errorf("failed to serialize worker ip addresses: %w", err)
+	}
+	if w.MachineFiles, err = serialize(machines, workerMachineFileName); err != nil {
+		return fmt.Errorf("failed to serialize worker machines: %w", err)
+	}
 	return nil
 }
 
@@ -840,6 +849,7 @@ func (w *Worker) Files() []*asset.File {
 	}
 	files = append(files, w.MachineConfigFiles...)
 	files = append(files, w.MachineSetFiles...)
+	files = append(files, w.MachineTemplateFiles...)
 	files = append(files, w.MachineFiles...)
 	files = append(files, w.IPClaimFiles...)
 	files = append(files, w.IPAddrFiles...)
@@ -944,13 +954,13 @@ func (w *Worker) MachineSets() ([]machinev1beta1.MachineSet, error) {
 }
 
 // TODO check if padding causes issues for ipam or other assets that dont use it.
-func serialize(manifests []runtime.Object, files []*asset.File, fileName string) error {
-	files = make([]*asset.File, len(manifests))
+func serialize(manifests []runtime.Object, fileName string) ([]*asset.File, error) {
+	files := make([]*asset.File, len(manifests))
 	padFormat := fmt.Sprintf("%%0%dd", len(fmt.Sprintf("%d", len(manifests))))
 	for i, m := range manifests {
 		data, err := yaml.Marshal(m)
 		if err != nil {
-			return fmt.Errorf("marshaling %s: %w", fmt.Sprintf(fileName, i), err)
+			return nil, fmt.Errorf("marshaling %s: %w", fmt.Sprintf(fileName, i), err)
 		}
 
 		padded := fmt.Sprintf(padFormat, i)
@@ -959,5 +969,5 @@ func serialize(manifests []runtime.Object, files []*asset.File, fileName string)
 			Data:     data,
 		}
 	}
-	return nil
+	return files, nil
 }
