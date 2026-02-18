@@ -288,7 +288,7 @@ func (m *Master) Generate(ctx context.Context, dependencies asset.Parents) error
 			}
 
 			// Marshal CAPI manifests to files
-			// Note: No ControlPlaneMachineSet for CAPI path
+			// TODO: ControlPlaneMachineSet for CAPI path
 			m.MachineFiles = make([]*asset.File, 0, len(capiMachines))
 			for _, rf := range capiMachines {
 				data, err := yaml.Marshal(rf.Object)
