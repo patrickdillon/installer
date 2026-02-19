@@ -34,7 +34,8 @@ func SetMachinePoolDefaults(p *types.MachinePool, platform *types.Platform, fgat
 	if p.Management == "" {
 		if p.Name == types.MachinePoolControlPlaneRoleName && fgates.Enabled(features.FeatureGateClusterAPIControlPlaneInstall) {
 			p.Management = types.ClusterAPI
-		} else if p.Name == types.MachinePoolComputeRoleName && fgates.Enabled(features.FeatureGateClusterAPIComputeInstall) {
+		}
+		if p.Name == types.MachinePoolComputeRoleName && fgates.Enabled(features.FeatureGateClusterAPIComputeInstall) {
 			p.Management = types.ClusterAPI
 		}
 	}
