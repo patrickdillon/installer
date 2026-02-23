@@ -261,11 +261,8 @@ func (m *Master) Generate(ctx context.Context, dependencies asset.Parents) error
 
 		pool.Platform.AWS = &mpool
 
-		// Check if CAPI control plane management is enabled
-		useClusterAPI := installConfig.Config.EnabledFeatureGates().Enabled(features.FeatureGateClusterAPIControlPlaneInstall) &&
-			pool.Management == types.ClusterAPI
-
-		if useClusterAPI {
+		//if pool.Management == types.ClusterAPI {
+		if false { //TODO ^
 			// Generate CAPI AWSMachine + Machine manifests
 			tags, err := aws.CapaTagsFromUserTags(clusterID.InfraID, installConfig.Config.Platform.AWS.UserTags)
 			if err != nil {
