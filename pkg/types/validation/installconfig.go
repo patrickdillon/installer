@@ -1571,14 +1571,14 @@ func ValidateFeatureSet(c *types.InstallConfig) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	clusterProfile := types.GetClusterProfileName()
-	featureSets, ok := features.AllFeatureSets()[clusterProfile]
-	if !ok {
-		logrus.Warnf("no feature sets for cluster profile %q", clusterProfile)
+	knownFeatureSets := make(map[configv1.FeatureSet]*features.FeatureGateEnabledDisabled)
+	for _, fs := range configv1.AllFixedFeatureSets {
+		knownFeatureSets[fs] = features.FeatureSets(0, clusterProfile, fs)
 	}
-	if _, ok := featureSets[c.FeatureSet]; c.FeatureSet != configv1.CustomNoUpgrade && !ok {
+	if _, ok := knownFeatureSets[c.FeatureSet]; c.FeatureSet != configv1.CustomNoUpgrade && !ok {
 		sortedFeatureSets := func() []string {
 			v := []string{}
-			for n := range features.AllFeatureSets()[clusterProfile] {
+			for n := range knownFeatureSets {
 				v = append(v, string(n))
 			}
 			// Add CustomNoUpgrade since it is not part of features sets for profiles

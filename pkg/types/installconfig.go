@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
@@ -625,11 +624,11 @@ func (c *InstallConfig) EnabledFeatureGates() featuregates.FeatureGate {
 	}
 
 	clusterProfile := GetClusterProfileName()
-	featureSets, ok := features.AllFeatureSets()[clusterProfile]
-	if !ok {
-		logrus.Warnf("no feature sets for cluster profile %q", clusterProfile)
+	knownFeatureSets := make(map[configv1.FeatureSet]*features.FeatureGateEnabledDisabled)
+	for _, fs := range configv1.AllFixedFeatureSets {
+		knownFeatureSets[fs] = features.FeatureSets(0, clusterProfile, fs)
 	}
-	fg := featuregates.FeatureGateFromFeatureSets(featureSets, c.FeatureSet, customFS)
+	fg := featuregates.FeatureGateFromFeatureSets(knownFeatureSets, c.FeatureSet, customFS)
 
 	return fg
 }
