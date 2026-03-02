@@ -10,6 +10,8 @@ set -euoE pipefail ## -E option will cause functions to inherit trap
 . /usr/local/bin/bootstrap-cluster-gather.sh
 # shellcheck source=bootstrap-verify-api-server-urls.sh
 . /usr/local/bin/bootstrap-verify-api-server-urls.sh
+# shellcheck source=konnectivity.sh.template
+. /usr/local/bin/konnectivity.sh
 
 mkdir --parents /etc/kubernetes/{manifests,bootstrap-configs,bootstrap-manifests}
 
@@ -18,6 +20,12 @@ BOOTSTRAP_INPLACE=true
 {{ else }}
 BOOTSTRAP_INPLACE=false
 {{ end -}}
+
+{{- if .KonnectivityEnabled }}
+KONNECTIVITY_ENABLED=true
+{{- else }}
+KONNECTIVITY_ENABLED=false
+{{- end }}
 
 ETCD_ENDPOINTS=
 
@@ -66,7 +74,6 @@ OPENSHIFT_HYPERKUBE_IMAGE=$(image_for hyperkube)
 OPENSHIFT_CLUSTER_POLICY_IMAGE=$(image_for cluster-policy-controller)
 
 CLUSTER_BOOTSTRAP_IMAGE=$(image_for cluster-bootstrap)
-KONNECTIVITY_IMAGE=$(image_for apiserver-network-proxy)
 
 mkdir --parents ./{bootstrap-manifests,manifests}
 
@@ -246,36 +253,7 @@ then
     record_service_stage_success
 fi
 
-# Detect bootstrap node IP at runtime using the default route source address
-# This is needed for Konnectivity agents to connect back to the bootstrap server.
-{{- if .UseIPv6ForNodeIP }}
-BOOTSTRAP_NODE_IP=$(ip -6 -j route get 2001:4860:4860::8888 | jq -r '.[0].prefsrc')
-{{- else }}
-BOOTSTRAP_NODE_IP=$(ip -j route get 1.1.1.1 | jq -r '.[0].prefsrc')
-{{- end }}
-echo "Detected bootstrap node IP: ${BOOTSTRAP_NODE_IP}"
-
-# Generate Konnectivity certificates (self-signed CA, server cert, agent cert)
-if [ ! -f konnectivity-certs.done ]
-then
-    record_service_stage_start "konnectivity-certs"
-    /usr/local/bin/konnectivity-certs.sh "${BOOTSTRAP_NODE_IP}"
-    touch konnectivity-certs.done
-    record_service_stage_success
-fi
-
-# Create Konnectivity server static pod manifest.
-# This runs on the bootstrap node and provides a proxy for the bootstrap KAS
-# to reach webhooks in the cluster's pod network.
-if [ ! -f konnectivity-server-bootstrap.done ]
-then
-    record_service_stage_start "konnectivity-server-bootstrap"
-    echo "Creating Konnectivity server static pod manifest..."
-    export KONNECTIVITY_IMAGE
-    envsubst < /opt/openshift/konnectivity-server-pod.yaml > /etc/kubernetes/manifests/konnectivity-server-pod.yaml
-    touch konnectivity-server-bootstrap.done
-    record_service_stage_success
-fi
+konnectivity_setup
 
 if [ ! -f kube-apiserver-bootstrap.done ]
 then
@@ -305,8 +283,9 @@ then
 		--config-override-files=/assets/konnectivity-config-override.yaml
 
 	cp kube-apiserver-bootstrap/config /etc/kubernetes/bootstrap-configs/kube-apiserver-config.yaml
-	# Copy egress selector config to bootstrap-configs where KAS can read it
-	cp /opt/openshift/egress-selector-config.yaml /etc/kubernetes/bootstrap-configs/egress-selector-config.yaml
+	if [ "${KONNECTIVITY_ENABLED}" = "true" ]; then
+		cp /opt/openshift/egress-selector-config.yaml /etc/kubernetes/bootstrap-configs/egress-selector-config.yaml
+	fi
 	cp kube-apiserver-bootstrap/bootstrap-manifests/* bootstrap-manifests/
 	cp kube-apiserver-bootstrap/manifests/* manifests/
 
@@ -601,31 +580,7 @@ then
     record_service_stage_success
 fi
 
-# Create Konnectivity agent manifests for cluster deployment.
-# The namespace, secret, and daemonset templates live as separate files
-# under /opt/openshift/ and are populated with runtime values here.
-if [ ! -f konnectivity-agent-manifest.done ]
-then
-    record_service_stage_start "konnectivity-agent-manifest"
-    echo "Creating Konnectivity agent manifests..."
-
-    KONNECTIVITY_CERT_DIR=/opt/openshift/tls/konnectivity
-
-    # Namespace
-    cp /opt/openshift/konnectivity-namespace.yaml manifests/konnectivity-namespace.yaml
-
-    # Agent certs secret (export base64-encoded cert data for envsubst)
-    export KONNECTIVITY_AGENT_CERT_BASE64=$(base64 -w0 "${KONNECTIVITY_CERT_DIR}/agent.crt")
-    export KONNECTIVITY_AGENT_KEY_BASE64=$(base64 -w0 "${KONNECTIVITY_CERT_DIR}/agent.key")
-    export KONNECTIVITY_CA_CERT_BASE64=$(base64 -w0 "${KONNECTIVITY_CERT_DIR}/ca.crt")
-    envsubst < /opt/openshift/konnectivity-agent-certs-secret.yaml > manifests/konnectivity-agent-certs.yaml
-
-    export BOOTSTRAP_NODE_IP
-    envsubst < /opt/openshift/konnectivity-agent-daemonset.yaml > manifests/konnectivity-agent-daemonset.yaml
-
-    touch konnectivity-agent-manifest.done
-    record_service_stage_success
-fi
+konnectivity_manifests
 
 REQUIRED_PODS="openshift-kube-apiserver/kube-apiserver,openshift-kube-scheduler/openshift-kube-scheduler,openshift-kube-controller-manager/kube-controller-manager,openshift-cluster-version/cluster-version-operator"
 if [ "$BOOTSTRAP_INPLACE" = true ]
@@ -712,18 +667,7 @@ if [ ! -f api-int-dns-check.done ]; then
   fi
 fi
 
-# Clean up bootstrap konnectivity resources by deleting the namespace.
-# This cascades to all resources (DaemonSet, Secret) within it.
-if [ ! -f konnectivity-cleanup.done ]; then
-    record_service_stage_start "konnectivity-cleanup"
-    echo "Cleaning up bootstrap konnectivity resources..."
-    oc delete namespace openshift-bootstrap-konnectivity \
-        --kubeconfig=/opt/openshift/auth/kubeconfig \
-        --ignore-not-found=true || true
-    rm -f /etc/kubernetes/manifests/konnectivity-server-pod.yaml
-    touch konnectivity-cleanup.done
-    record_service_stage_success
-fi
+konnectivity_cleanup
 
 # Workaround for https://github.com/opencontainers/runc/pull/1807
 touch /opt/openshift/.bootkube.done

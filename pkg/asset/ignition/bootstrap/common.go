@@ -25,6 +25,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	configv1 "github.com/openshift/api/config/v1"
+	"github.com/openshift/api/features"
 	"github.com/openshift/installer/data"
 	"github.com/openshift/installer/pkg/asset"
 	"github.com/openshift/installer/pkg/asset/ignition"
@@ -97,6 +98,7 @@ type bootstrapTemplateData struct {
 	FeatureSet            configv1.FeatureSet
 	Invoker               string
 	ClusterDomain         string
+	KonnectivityEnabled   bool
 }
 
 // platformTemplateData is the data to use to replace values in bootstrap
@@ -401,6 +403,7 @@ func (a *Common) getTemplateData(dependencies asset.Parents, bootstrapInPlace bo
 		FeatureSet:            installConfig.Config.FeatureSet,
 		Invoker:               openshiftInstallInvoker,
 		ClusterDomain:         installConfig.Config.ClusterDomain(),
+		KonnectivityEnabled:   !bootstrapInPlace && installConfig.Config.EnabledFeatureGates().Enabled(features.FeatureGateMachineAPIMigrationAWS),
 	}
 }
 
