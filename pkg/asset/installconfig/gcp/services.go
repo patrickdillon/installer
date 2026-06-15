@@ -59,6 +59,17 @@ func CreateEndpointOption(endpointName string, service ServiceNameGCP) option.Cl
 	return option.WithEndpoint(endpoint)
 }
 
+// CredentialOption returns the appropriate client option for the session credentials.
+// When raw credential JSON is available, WithCredentialsJSON is used so that the
+// Google API library can apply self-signed JWT authentication for non-default
+// universe domains (e.g., Google Cloud Dedicated).
+func CredentialOption(ssn *Session) option.ClientOption {
+	if len(ssn.Credentials.JSON) > 0 {
+		return option.WithCredentialsJSON(ssn.Credentials.JSON)
+	}
+	return option.WithCredentials(ssn.Credentials)
+}
+
 // getOptions creates the options for use during service creation.
 func getOptions(ctx context.Context) ([]option.ClientOption, error) {
 	ssn, err := GetSession(ctx)
@@ -67,7 +78,7 @@ func getOptions(ctx context.Context) ([]option.ClientOption, error) {
 	}
 
 	options := []option.ClientOption{
-		option.WithCredentials(ssn.Credentials),
+		CredentialOption(ssn),
 	}
 	return options, nil
 }
