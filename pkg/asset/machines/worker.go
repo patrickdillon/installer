@@ -844,6 +844,16 @@ func (w *Worker) Generate(ctx context.Context, dependencies asset.Parents) error
 		Data:     data,
 	}
 
+	if ic.Platform.Name() == gcptypes.Name {
+		ignCRIO, err := machineconfig.ForCRIODefaultEnv("worker", map[string]string{
+			"GOOGLE_CLOUD_UNIVERSE_DOMAIN": "apis-berlin-build0.goog",
+		})
+		if err != nil {
+			return errors.Wrap(err, "failed to create ignition for CRI-O default env for worker machines")
+		}
+		machineConfigs = append(machineConfigs, ignCRIO)
+	}
+
 	w.MachineConfigFiles, err = machineconfig.Manifests(machineConfigs, "worker", directory)
 	if err != nil {
 		return errors.Wrap(err, "failed to create MachineConfig manifests for worker machines")
