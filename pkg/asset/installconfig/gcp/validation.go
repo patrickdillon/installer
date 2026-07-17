@@ -727,6 +727,7 @@ func ValidateCredentialMode(client API, ic *types.InstallConfig) field.ErrorList
 			errMsg := "environmental authentication is only supported with Manual credentials mode"
 			return append(allErrs, field.Forbidden(field.NewPath("credentialsMode"), errMsg))
 		}
+
 	} else if creds.JSON == nil && ic.CredentialsMode != types.ManualCredentialsMode {
 		errMsg := "Manual credentials mode needs to be enabled to use environmental authentication"
 		return append(allErrs, field.Forbidden(field.NewPath("credentialsMode"), errMsg))
